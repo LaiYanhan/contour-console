@@ -7,7 +7,7 @@ import {
   ADMIN_CONFIG,
 } from './CommandParser';
 import { tacticalAudio } from '../audio/TacticalAudio';
-import { DEEP_POST_BOOT_SEQUENCE } from './BootSequenceData';
+import { HARDWARE_POST_LOGS, CLEAN_EMBLEM_SEQUENCE } from './BootSequenceData';
 
 interface BootTerminalProps {
   session: OperatorSession | null;
@@ -41,8 +41,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const streamQueueRef = useRef<Array<{ text: string; type: TerminalLine['type']; delay?: number }>>([]);
   const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const streamCallbackRef = useRef<(() => void) | null>(null);
   const pendingNavRef = useRef<TacticalView | null>(null);
-
   // Directly append a line to buffer without animation
   const appendImmediateLine = (text: string, type: TerminalLine['type']) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -54,6 +54,14 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const processStreamQueue = () => {
     if (streamQueueRef.current.length === 0) {
       streamTimerRef.current = null;
+
+      if (streamCallbackRef.current) {
+        const cb = streamCallbackRef.current;
+        streamCallbackRef.current = null;
+        cb();
+        return;
+      }
+
       setIsStreaming(false);
       if (pendingNavRef.current) {
         const dest = pendingNavRef.current;
@@ -62,6 +70,9 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         if (isDrawer && onCloseDrawer) onCloseDrawer();
       } else {
         tacticalAudio.playPromptBeep();
+        setTimeout(() => {
+          inputRef.current?.focus({ preventScroll: true });
+        }, 10);
       }
       return;
     }
@@ -73,24 +84,27 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     setLines((prev) => [...prev, { id, text: next.text, type: next.type, timestamp }]);
     tacticalAudio.playKeyClick();
 
-    const delay = next.delay ?? 22; // 22ms default for command outputs
+    const delay = next.delay ?? 22;
     streamTimerRef.current = setTimeout(processStreamQueue, delay);
   };
 
   // Stream an array of lines line-by-line
   const streamLines = (
     newItems: Array<{ text: string; type: TerminalLine['type']; delay?: number }>,
-    nextView?: TacticalView
+    nextView?: TacticalView,
+    onDone?: () => void
   ) => {
     if (newItems.length === 0) {
       if (nextView) {
         onNavigate(nextView);
         if (isDrawer && onCloseDrawer) onCloseDrawer();
       }
+      if (onDone) onDone();
       return;
     }
 
     if (nextView) pendingNavRef.current = nextView;
+    if (onDone) streamCallbackRef.current = onDone;
     streamQueueRef.current = [...streamQueueRef.current, ...newItems];
     setIsStreaming(true);
 
@@ -103,17 +117,26 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const skipStreaming = () => {
     clearTimeout(streamTimerRef.current);
     streamTimerRef.current = null;
+    streamCallbackRef.current = null;
+    streamQueueRef.current = [];
 
-    if (streamQueueRef.current.length > 0) {
+    // If skipping during initial unauthenticated boot: clear and stamp clean emblem!
+    if (!session && loginStep === 'username') {
+      setLines([]);
       const timestamp = new Date().toTimeString().split(' ')[0];
-      const flushed: TerminalLine[] = streamQueueRef.current.map((item) => ({
+      const emblemLines: TerminalLine[] = CLEAN_EMBLEM_SEQUENCE.map((item) => ({
         id: `${Date.now()}-${Math.random()}`,
         text: item.text,
         type: item.type,
         timestamp,
       }));
-      streamQueueRef.current = [];
-      setLines((prev) => [...prev, ...flushed]);
+      setLines(emblemLines);
+      setIsStreaming(false);
+      tacticalAudio.playPromptBeep();
+      setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 20);
+      return;
     }
 
     setIsStreaming(false);
@@ -125,6 +148,9 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       if (isDrawer && onCloseDrawer) onCloseDrawer();
     } else {
       tacticalAudio.playPromptBeep();
+      setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 20);
     }
   };
 
@@ -145,12 +171,31 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
           type: 'warn',
         },
       ]);
+      setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 20);
       return;
     }
 
-    // Cold boot: stream deep 160-line hardware POST diagnostic sequence!
-    streamLines(DEEP_POST_BOOT_SEQUENCE);
-
+    // Stage 1: Cold boot 160-line hardware POST logs (Fluctuating Cadence: Slow -> Fast -> Slow)
+    streamLines(HARDWARE_POST_LOGS, undefined, () => {
+      // Stage 2: POST complete! Wait 350ms, CLEAR SCREEN, then stream CLEAN_EMBLEM_SEQUENCE!
+      streamTimerRef.current = setTimeout(() => {
+        streamTimerRef.current = null;
+        setLines([]); // PHYSICAL SCREEN CLEAR
+        tacticalAudio.playTransition();
+        streamLines(CLEAN_EMBLEM_SEQUENCE, undefined, () => {
+          setIsStreaming(false);
+          tacticalAudio.playPromptBeep();
+          setTimeout(() => {
+            inputRef.current?.focus({ preventScroll: true });
+            if (containerRef.current) {
+              containerRef.current.scrollTop = containerRef.current.scrollHeight;
+            }
+          }, 30);
+        });
+      }, 350);
+    });
     return () => {
       clearTimeout(streamTimerRef.current);
     };
@@ -173,7 +218,10 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     if (isStreaming) {
       skipStreaming();
     } else {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
+      if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
     }
   };
 
@@ -181,6 +229,9 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
     setCursorPos(e.target.selectionStart ?? e.target.value.length);
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -508,7 +559,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
           {renderInlineCaretText()}
 
-          {/* Off-screen/hidden capture input element */}
+          {/* INLINE ANCHORED INPUT: Positioned directly in active prompt line, ZERO scroll jump! */}
           <input
             ref={inputRef}
             type="text"
@@ -518,7 +569,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
             autoFocus
             spellCheck={false}
             autoComplete="off"
-            className="opacity-0 absolute -left-[9999px] -top-[9999px] w-1 h-1 pointer-events-none"
+            className="opacity-0 absolute inset-0 w-full h-full pointer-events-none cursor-default"
           />
         </div>
       )}
