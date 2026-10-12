@@ -1,4 +1,4 @@
-import type { TerminalLine } from '../../types/tactical';
+import type { LineToken, TerminalLine } from '../../types/tactical';
 
 export interface BootStreamItem {
   text: string;
@@ -6,27 +6,91 @@ export interface BootStreamItem {
   delay?: number;
 }
 
-// 1. HARDWARE POST DIAGNOSTIC SEQUENCE (160 Lines with Fluctuating Cadence)
+/**
+ * Watch Dogs 2 & Linux Hardware Tokenizer:
+ * Parses a single line into rich multi-color segments:
+ * - Timestamps: dim slate
+ * - Status tags (OK, PASS, ONLINE, NOMINAL): bright emerald glow
+ * - State labels (STATUS:, STARTED:, MOUNT:): white bold
+ * - Devices & Partitions (EXT4-fs, (sda1), Dedware, TalosFS): cyan
+ * - Memory addresses & Hex ranges: hazard lemon yellow
+ * - Errors & Warnings (FAIL, CRITICAL, WARN): alert crimson
+ */
+export function tokenizeText(text: string): LineToken[] {
+  const tokenRegex =
+    /(\[\s*\d+\.\d+\s*\])|(\[mem\s+0x[0-9a-fA-F]+(?:-0x[0-9a-fA-F]+)?\]|0x[0-9a-fA-F]+(?:-[0-9a-fA-F]+)?)|(\b(?:OK|PASS|SUCCESS|ONLINE|NOMINAL)\b|\b(?:STARTED|STATUS|MOUNT|INIT):\b|\b(?:FAIL|FAILED|ERROR|WARN|CRITICAL)\b)|(\(sda\d+\)|EXT4-fs|Dedware|TalosFS|AIC-OS|aic\d+|ctos\d+|\/ub1\/[\w.-]+:)/gi;
+
+  const tokens: LineToken[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push({ text: text.slice(lastIndex, match.index), className: 'text-[#C5D3E8]' });
+    }
+
+    const fullMatch = match[0];
+    if (match[1]) {
+      // Timestamp [ 0.000000 ]
+      tokens.push({ text: fullMatch, className: 'text-endfield-slate text-[11px] font-mono' });
+    } else if (match[2]) {
+      // Memory address / Hex range
+      tokens.push({ text: fullMatch, className: 'text-endfield-yellow font-mono font-bold' });
+    } else if (match[3]) {
+      // Status tag
+      const upper = fullMatch.toUpperCase();
+      if (
+        upper.includes('OK') ||
+        upper.includes('PASS') ||
+        upper.includes('ONLINE') ||
+        upper.includes('NOMINAL') ||
+        upper.includes('SUCCESS')
+      ) {
+        tokens.push({
+          text: fullMatch,
+          className: 'text-endfield-emerald font-bold text-glow-emerald',
+        });
+      } else if (upper.includes('STARTED') || upper.includes('STATUS') || upper.includes('MOUNT') || upper.includes('INIT')) {
+        tokens.push({ text: fullMatch, className: 'text-white font-bold' });
+      } else {
+        tokens.push({ text: fullMatch, className: 'text-endfield-crimson font-bold' });
+      }
+    } else if (match[4]) {
+      // Device / partition / filesystem
+      tokens.push({ text: fullMatch, className: 'text-endfield-cyan font-bold font-mono' });
+    }
+
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    tokens.push({ text: text.slice(lastIndex), className: 'text-[#C5D3E8]' });
+  }
+
+  return tokens;
+}
+
+// 1. HARDWARE POST DIAGNOSTIC SEQUENCE (160 Lines with Fluctuating Cadence, ZERO Chinese, ZERO Emojis)
 // Phase 1: Slow (45-75ms) -> Phase 2: Ultra-fast (8-14ms) -> Phase 3: Slow (55-85ms)
 export const HARDWARE_POST_LOGS: BootStreamItem[] = [
-  // --- PHASE 1: SLOW / DELIBERATE CPU & UEFI POST (Lines 1 - 25, 45-70ms) ---
-  { text: '[ 0.000000] TALOS-II COLD BOOT: INITIALIZING HARDWARE ARCHITECTURE...', type: 'system', delay: 70 },
-  { text: '[ 0.001042] CPU0: MICROCODE REV: 0x0000024B (AMD/ARM64 NEURAL SUBTERRA HYBRID)', type: 'info', delay: 60 },
-  { text: '[ 0.002190] CPU0: SMU FIRMWARE VERSION: 76.19.00 // TELEMETRY CALIBRATION: OK', type: 'info', delay: 55 },
-  { text: '[ 0.003412] CPU0: 16 PHYSICAL CORES / 32 LOGICAL THREADS DETECTED', type: 'info', delay: 50 },
-  { text: '[ 0.004819] CPU0: L1 D-CACHE: 32K (8-WAY) | L1 I-CACHE: 32K (8-WAY)', type: 'info', delay: 50 },
-  { text: '[ 0.005910] CPU0: L2 CACHE: 512K (8-WAY) | L3 UNIFIED CACHE: 64M (16-WAY)', type: 'info', delay: 50 },
-  { text: '[ 0.007120] APIC: LOCAL APIC CLOCK TICK RATE: 1000.000 MHz', type: 'info', delay: 55 },
-  { text: '[ 0.008412] SMP: BRINGING UP SECONDARY CPUS...', type: 'info', delay: 65 },
-  { text: '[ 0.009980] SMP: CPU1 THROUGH CPU15 NODE ONLINE // STATUS: SYNCHRONIZED', type: 'success', delay: 55 },
-  { text: '[ 0.011240] ACPI: RSDP 0x000000007FFE0014 (V02 TALOS ) FIXED ACPI DESCRIPTION TABLE', type: 'info', delay: 50 },
-  { text: '[ 0.012580] ACPI: XSDT 0x000000007FFE00E8 (V01 TALOS AIC_SYS 0x00000001)', type: 'info', delay: 50 },
-  { text: '[ 0.013920] ACPI: FADT 0x000000007FFE0180 (V06 TALOS AIC_SYS 0x00000001)', type: 'info', delay: 50 },
-  { text: '[ 0.015240] ACPI: MADT 0x000000007FFE02D0 (V05 TALOS AIC_SYS 0x00000001)', type: 'info', delay: 50 },
-  { text: '[ 0.016620] ACPI: DSDT 0x000000007FFE0360 (V02 TALOS AIC_DSDT 0x00000001)', type: 'info', delay: 50 },
-  { text: '[ 0.017990] ACPI: 24 GLOBAL SYSTEM INTERRUPTS REGISTERED VIA IO-APIC #0', type: 'info', delay: 50 },
-  { text: '[ 0.019410] VCORE VOLTAGE TELEMETRY: 1.182V (NOMINAL) // VRM TEMP: 41.2°C [STABLE]', type: 'info', delay: 55 },
-  { text: '[ 0.020810] CLOCK GENERATOR: SPREAD SPECTRUM MODULATION ACTIVE [100.00 MHz]', type: 'info', delay: 60 },
+  // --- PHASE 1: DISK CACHE, FUSE USERSPACE & EARLY POST (Lines 1 - 25, 45-75ms) ---
+  { text: '[ 0.000000] sd 0:0:0:0:0ddbu22 [Dedware] Disk Cache Policy: write-through enabled.', type: 'info', delay: 70 },
+  { text: '[ 0.001042] Logical sector allocation path verified: LBA 0x00000000 - 0x7FFFFFFF.', type: 'info', delay: 60 },
+  { text: '[ 0.002190] /ub1/player: clean, 1704684/10121989 files, 3813438/7532544 blocks.', type: 'info', delay: 55 },
+  { text: '[ 0.003412] STARTED: Mounting Dedware FUSE user-space filesystem driver.', type: 'info', delay: 55 },
+  { text: '[ 0.004819] Querying systemctl status: "runDedware\\\\fuse.mount" for mount descriptor.', type: 'info', delay: 50 },
+  { text: '[ 0.005910] Initial memory mapping: [mem 0x00100000-0xdefa4fff]', type: 'info', delay: 50 },
+  { text: '[ 0.007120] High-memory aperture mapping: [mem 0x00100000-0x001fffff]', type: 'info', delay: 50 },
+  { text: '[ 0.008412] Network packet tag: PROTOCOL = RAW_DEDSECOv4_AIC_BRIDGE', type: 'info', delay: 50 },
+  { text: '[ 0.009980] Freeing initrd memory: 18780K (0xffff880035b42000 - 0xffff880036d99000)', type: 'info', delay: 55 },
+  { text: '[ 0.011240] PCI-DMA: Input/output memory mapped with software reflection buffer (SFDed).', type: 'info', delay: 55 },
+  { text: '[ 0.012580] STATUS: OK EXT4-fs (sda1): Orphaned inode list cleared on read-only mount.', type: 'success', delay: 55 },
+  { text: '[ 0.013920] STATUS: OK EXT4-fs (sda1): Journal recovery complete.', type: 'success', delay: 55 },
+  { text: '[ 0.015240] STATUS: OK EXT4-fs (sda1): Mounted filesystem with ordered data mode.', type: 'success', delay: 55 },
+  { text: '[ 0.016620] STATUS: OK Multi-processor affinity table mapped at [mem 0x10121989-0x000f9bff]', type: 'success', delay: 60 },
+  { text: '[ 0.017990] Scanning 1 low-memory integrity zone for corruption: [mem 0x00000000-0x0000FFFF]', type: 'info', delay: 55 },
+  { text: '[ 0.019410] Monitoring Blume backup container telemetry... Virtual event hook ONLINE.', type: 'info', delay: 55 },
+  { text: '[ 0.020810] Mounted block device Dedware: operator root partition ACTIVE.', type: 'info', delay: 65 },
 
   // --- PHASE 2: ULTRA-FAST FLOOD (Memory / PCIe / AIC Network, Lines 26 - 130, 8-14ms) ---
   { text: '[ 0.022140] MEMORY CONTROLLER: QUAD-CHANNEL DDR5-6400 TRANSLATION LAYER INIT', type: 'warn', delay: 14 },
@@ -86,7 +150,7 @@ export const HARDWARE_POST_LOGS: BootStreamItem[] = [
   { text: '[ 0.099820] [HARDWARE POST COMPLETE // ALL 160 SUBSYSTEMS NOMINAL]', type: 'success', delay: 350 },
 ];
 
-// 2. STAGE 2: CLEAN EMBLEM & GATEWAY PROMPT (Stamped on clean screen after clear)
+// 2. STAGE 2: CLEAN EMBLEM & GATEWAY PROMPT (Stamped on clean screen after POST clear, ZERO Chinese, ZERO Emojis)
 export const CLEAN_EMBLEM_SEQUENCE: BootStreamItem[] = [
   { text: '  ███████╗███╗   ██╗██████╗ ███████╗██╗███████╗██╗     ██████╗ ', type: 'ascii', delay: 25 },
   { text: '  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║██╔════╝██║     ██╔══██╗', type: 'ascii', delay: 25 },
@@ -96,6 +160,6 @@ export const CLEAN_EMBLEM_SEQUENCE: BootStreamItem[] = [
   { text: '  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝ ', type: 'ascii', delay: 25 },
   { text: '    // TALOS-II PROTOCOL GATEWAY // TACTICAL ARCHITECTURE //   ', type: 'ascii', delay: 45 },
   { text: '================================================================', type: 'system', delay: 25 },
-  { text: '[TALOS-II OPERATOR GATEWAY]: System booted. Unauthenticated profile.', type: 'warn', delay: 30 },
+  { text: '[TALOS-II OPERATOR GATEWAY]: System booted. Dedware session mounted.', type: 'warn', delay: 30 },
   { text: 'Provisioning guest profile. Enter Operator ID (or admin for root):', type: 'info', delay: 30 },
 ];

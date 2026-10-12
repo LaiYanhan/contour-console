@@ -1,4 +1,5 @@
 import type { CommandDef, OperatorSession, TacticalView } from '../../types/tactical';
+import { VirtualFileSystem } from '../../vfs/vfs';
 
 export const ADMIN_CONFIG = {
   username: 'admin',
@@ -7,6 +8,49 @@ export const ADMIN_CONFIG = {
 };
 
 export const COMMAND_REGISTRY: CommandDef[] = [
+  // POSIX / VFS File Management Commands
+  {
+    command: 'ls',
+    usage: 'ls [-l] [path]',
+    description: 'List files and directories in current or specified folder',
+  },
+  {
+    command: 'cd',
+    usage: 'cd <path>',
+    description: 'Change working directory (supports ~, .., relative/absolute paths)',
+  },
+  {
+    command: 'pwd',
+    usage: 'pwd',
+    description: 'Print current working directory path',
+  },
+  {
+    command: 'cat',
+    usage: 'cat <filename>',
+    description: 'Concatenate and display text content of specified file',
+  },
+  {
+    command: 'vim',
+    usage: 'vim <filename>',
+    description: 'Open in-line terminal text reader/editor for clues and logs',
+  },
+  {
+    command: 'mkdir',
+    usage: 'mkdir <dirname>',
+    description: 'Create a new directory in current working path',
+  },
+  {
+    command: 'touch',
+    usage: 'touch <filename>',
+    description: 'Create an empty file or update timestamp',
+  },
+  {
+    command: 'rm',
+    usage: 'rm <filename>',
+    description: 'Remove file or directory from virtual filesystem',
+  },
+
+  // Tactical System Commands
   {
     command: 'help',
     usage: 'help [command]',
@@ -47,6 +91,7 @@ export const COMMAND_REGISTRY: CommandDef[] = [
     usage: 'clear',
     description: 'Flush current terminal buffer and reset display stream',
   },
+
   // Root / Admin Privileged Commands
   {
     command: 'system.override',
@@ -83,11 +128,13 @@ export interface ParseResult {
   }>;
   nextView?: TacticalView;
   clearSession?: boolean;
+  openVim?: { fileName: string; content: string };
 }
 
 export function parseAndExecuteCommand(
   rawInput: string,
-  session: OperatorSession | null
+  session: OperatorSession | null,
+  vfs?: VirtualFileSystem
 ): ParseResult {
   const trimmed = rawInput.trim();
   if (trimmed.length === 0) {
@@ -95,14 +142,17 @@ export function parseAndExecuteCommand(
   }
 
   const isRoot = session?.isRoot ?? false;
+  const parts = trimmed.split(/\s+/);
+  const cmdName = parts[0]?.toLowerCase();
+  const cmdArg = parts.slice(1).join(' ').trim();
 
-  // Exact or prefix matching
+  // 1. HELP MATRIX
   if (trimmed === 'help' || trimmed === 'help.list' || trimmed === 'help --list') {
     const output: ParseResult['lines'] = [
       { text: '================================================================', type: 'system' },
-      { text: '  ENDFIELD TACTICAL OS // COMMAND MATRIX INTERFACE', type: 'info' },
+      { text: '  TALOS-II / DEDWARE // COMMAND MATRIX INTERFACE', type: 'info' },
       { text: '================================================================', type: 'system' },
-      { text: 'USAGE: Enter exact command or use [TAB] for auto-completion.', type: 'warn' },
+      { text: 'USAGE: Type command or press [TAB] for longest common prefix completion.', type: 'warn' },
       { text: '', type: 'info' },
     ];
 
@@ -119,7 +169,7 @@ export function parseAndExecuteCommand(
     if (!isRoot) {
       output.push({ text: '', type: 'info' });
       output.push({
-        text: '  NOTE: [3] Root-level privileged commands are hidden. Log in as admin to unlock.',
+        text: '  NOTE: [3] Root-level privileged commands hidden. Log in as admin to unlock.',
         type: 'warn',
       });
     }
@@ -131,6 +181,135 @@ export function parseAndExecuteCommand(
     return { lines: [] };
   }
 
+  // 2. POSIX VFS: PWD
+  if (cmdName === 'pwd') {
+    const cur = vfs ? vfs.getCurrentPath() : '/home/guest';
+    return {
+      lines: [{ text: cur, type: 'info' }],
+    };
+  }
+
+  // 3. POSIX VFS: CD
+  if (cmdName === 'cd') {
+    if (!vfs) return { lines: [{ text: 'cd: vfs not initialized', type: 'error' }] };
+    const target = cmdArg || '~';
+    const res = vfs.changeDirectory(target);
+    if (!res.success) {
+      return { lines: [{ text: res.error || 'cd: error', type: 'error' }] };
+    }
+    return { lines: [] };
+  }
+
+  // 4. POSIX VFS: LS
+  if (cmdName === 'ls') {
+    if (!vfs) return { lines: [{ text: 'ls: vfs not initialized', type: 'error' }] };
+    const isLong = parts.includes('-l') || parts.includes('-la') || parts.includes('-al');
+    const pathArg = parts.filter((p) => !p.startsWith('-') && p !== 'ls')[0] || '';
+
+    const res = vfs.listDirectory(pathArg);
+    if (!res.success || !res.nodes) {
+      return { lines: [{ text: res.error || 'ls: error', type: 'error' }] };
+    }
+
+    if (res.nodes.length === 0) {
+      return { lines: [{ text: '[empty directory]', type: 'system' }] };
+    }
+
+    if (isLong) {
+      const output: ParseResult['lines'] = [
+        { text: `total ${res.nodes.length * 4}`, type: 'system' },
+      ];
+      res.nodes.forEach((node) => {
+        const isDir = node.type === 'dir';
+        const perms = node.permissions || (isDir ? 'drwxr-xr-x' : '-rw-r--r--');
+        const contentLen = node.type === 'file' ? new TextEncoder().encode(node.content).length : 4096;
+        const size = `${contentLen}`.padStart(5);
+        const date = node.updatedAt || 'Oct 12 12:00';
+        const nameSuffix = isDir ? '/' : node.isExecutable ? '*' : '';
+        const lineType: TerminalLine['type'] = isDir ? 'info' : node.isExecutable ? 'success' : node.isSecret ? 'warn' : 'system';
+
+        output.push({
+          text: `${perms}  1  ${session?.username || 'op'}  ${session?.username || 'op'}  ${size}  ${date}  ${node.name}${nameSuffix}`,
+          type: lineType,
+        });
+      });
+      return { lines: output };
+    }
+
+    // Short format with colored labels
+    const formatted = res.nodes
+      .map((n) => {
+        if (n.type === 'dir') return `[DIR] ${n.name}/`;
+        if (n.isExecutable) return `[EXE] ${n.name}*`;
+        if (n.isSecret) return `[SEC] ${n.name}`;
+        return `      ${n.name}`;
+      })
+      .join('    ');
+
+    return {
+      lines: [{ text: formatted, type: 'info' }],
+    };
+  }
+
+  // 5. POSIX VFS: CAT
+  if (cmdName === 'cat') {
+    if (!vfs) return { lines: [{ text: 'cat: vfs not initialized', type: 'error' }] };
+    if (!cmdArg) return { lines: [{ text: 'cat: missing file operand', type: 'error' }] };
+
+    const res = vfs.readFile(cmdArg);
+    if (!res.success || res.content === undefined) {
+      return { lines: [{ text: res.error || 'cat: read error', type: 'error' }] };
+    }
+
+    const outputLines: ParseResult['lines'] = res.content
+      .split('\n')
+      .map((line) => ({ text: line, type: 'info' }));
+
+    return { lines: outputLines };
+  }
+
+  // 6. POSIX VFS: VIM / VIEW
+  if (cmdName === 'vim' || cmdName === 'view' || cmdName === 'nano') {
+    if (!vfs) return { lines: [{ text: 'vim: vfs not initialized', type: 'error' }] };
+    if (!cmdArg) return { lines: [{ text: 'vim: missing file operand', type: 'error' }] };
+
+    const res = vfs.readFile(cmdArg);
+    const content = res.success && res.content !== undefined ? res.content : '';
+
+    return {
+      lines: [],
+      openVim: { fileName: cmdArg, content },
+    };
+  }
+
+  // 7. POSIX VFS: MKDIR
+  if (cmdName === 'mkdir') {
+    if (!vfs) return { lines: [{ text: 'mkdir: vfs not initialized', type: 'error' }] };
+    if (!cmdArg) return { lines: [{ text: 'mkdir: missing operand', type: 'error' }] };
+    const res = vfs.makeDirectory(cmdArg);
+    if (!res.success) return { lines: [{ text: res.error || 'mkdir error', type: 'error' }] };
+    return { lines: [{ text: `Directory '${cmdArg}' created.`, type: 'success' }] };
+  }
+
+  // 8. POSIX VFS: TOUCH
+  if (cmdName === 'touch') {
+    if (!vfs) return { lines: [{ text: 'touch: vfs not initialized', type: 'error' }] };
+    if (!cmdArg) return { lines: [{ text: 'touch: missing file operand', type: 'error' }] };
+    const res = vfs.touchFile(cmdArg);
+    if (!res.success) return { lines: [{ text: res.error || 'touch error', type: 'error' }] };
+    return { lines: [{ text: `File '${cmdArg}' touched.`, type: 'success' }] };
+  }
+
+  // 9. POSIX VFS: RM
+  if (cmdName === 'rm') {
+    if (!vfs) return { lines: [{ text: 'rm: vfs not initialized', type: 'error' }] };
+    if (!cmdArg) return { lines: [{ text: 'rm: missing operand', type: 'error' }] };
+    const res = vfs.removeNode(cmdArg);
+    if (!res.success) return { lines: [{ text: res.error || 'rm error', type: 'error' }] };
+    return { lines: [{ text: `Removed '${cmdArg}'.`, type: 'warn' }] };
+  }
+
+  // 10. TACTICAL TRANSITIONS & PROTOCOLS
   if (trimmed === 'system.connect holotable' || trimmed === 'deploy.sector valley-4') {
     return {
       lines: [
@@ -142,7 +321,6 @@ export function parseAndExecuteCommand(
   }
 
   if (trimmed.startsWith('navigate.to')) {
-    const parts = trimmed.split(/\s+/);
     const target = parts[1]?.toLowerCase();
     const validTargets: Record<string, TacticalView> = {
       operator: 'operator',
@@ -203,6 +381,7 @@ export function parseAndExecuteCommand(
         { text: `OPERATOR ID   : @${session.username}`, type: session.isRoot ? 'root' : 'success' },
         { text: `CLEARANCE     : ${session.clearance}`, type: session.isRoot ? 'root' : 'warn' },
         { text: `ACCESS TOKEN  : ${session.token}`, type: 'info' },
+        { text: `CURRENT VFS   : ${vfs ? vfs.getCurrentPath() : '/home/' + session.username}`, type: 'info' },
         { text: `SESSION AGE   : ${duration}s`, type: 'info' },
       ],
     };
@@ -267,7 +446,7 @@ export function parseAndExecuteCommand(
   return {
     lines: [
       { text: `[COMMAND UNRECOGNIZED]: '${trimmed}'`, type: 'error' },
-      { text: `Type 'help' to review the valid tactical command matrix.`, type: 'warn' },
+      { text: `Type 'help' to review the valid tactical command matrix or 'ls' to view files.`, type: 'warn' },
     ],
   };
 }
@@ -294,13 +473,55 @@ export function computeLcp(strings: string[]): string {
 
 export function handleTabCompletion(
   rawInput: string,
-  isRoot: boolean
+  isRoot: boolean,
+  vfs?: VirtualFileSystem
 ): AutocompleteResult {
-  const trimmed = rawInput.trim().toLowerCase();
+  const trimmed = rawInput.toLowerCase();
   if (!trimmed) {
     return { completedValue: rawInput, candidates: [], hasAdvanced: false, isSingleMatch: false };
   }
 
+  // 1. File and Directory autocompletion for cd, cat, vim, rm
+  const fileCmds = ['cd ', 'cat ', 'vim ', 'view ', 'rm ', 'touch '];
+  for (const cmd of fileCmds) {
+    if (trimmed.startsWith(cmd)) {
+      const prefix = rawInput.slice(0, cmd.length);
+      const sub = rawInput.slice(cmd.length).trim().toLowerCase();
+
+      if (vfs) {
+        const listRes = vfs.listDirectory();
+        if (listRes.success && listRes.nodes) {
+          const fileCandidates: string[] = [];
+          listRes.nodes.forEach((n) => {
+            const name = n.name + (n.type === 'dir' ? '/' : '');
+            if (name.toLowerCase().startsWith(sub)) {
+              fileCandidates.push(`${prefix}${name}`);
+            }
+          });
+
+          if (fileCandidates.length === 1) {
+            return {
+              completedValue: fileCandidates[0],
+              candidates: fileCandidates,
+              hasAdvanced: fileCandidates[0].toLowerCase() !== trimmed,
+              isSingleMatch: true,
+            };
+          }
+          if (fileCandidates.length > 1) {
+            const lcp = computeLcp(fileCandidates);
+            return {
+              completedValue: lcp.length > rawInput.length ? lcp : rawInput,
+              candidates: fileCandidates,
+              hasAdvanced: lcp.length > rawInput.length,
+              isSingleMatch: false,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Command autocompletion from COMMAND_REGISTRY
   const candidates: string[] = [];
   COMMAND_REGISTRY.forEach((cmd) => {
     if (cmd.requiresRoot && !isRoot) return;
@@ -321,12 +542,14 @@ export function handleTabCompletion(
       }
     });
   }
+
   const seen: Record<string, true> = {};
   const uniqueCandidates = candidates.filter((item) => {
     if (seen[item]) return false;
     seen[item] = true;
     return true;
   });
+
   if (uniqueCandidates.length === 0) {
     return { completedValue: rawInput, candidates: [], hasAdvanced: false, isSingleMatch: false };
   }

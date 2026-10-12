@@ -18,11 +18,18 @@ export type TacticalView =
   | 'breach'
   | 'kernel';
 
+export interface LineToken {
+  text: string;
+  color?: string;
+  className?: string;
+}
+
 export interface TerminalLine {
   id: string;
   text: string;
   type: 'system' | 'info' | 'success' | 'warn' | 'error' | 'input' | 'ascii' | 'root';
   timestamp?: string;
+  tokens?: LineToken[];
 }
 
 export interface CommandDef {

@@ -7,7 +7,9 @@ import {
   ADMIN_CONFIG,
 } from './CommandParser';
 import { tacticalAudio } from '../audio/TacticalAudio';
-import { HARDWARE_POST_LOGS, CLEAN_EMBLEM_SEQUENCE } from './BootSequenceData';
+import { tokenizeText, HARDWARE_POST_LOGS, CLEAN_EMBLEM_SEQUENCE } from './BootSequenceData';
+import { VirtualFileSystem } from '../../vfs/vfs';
+import { VimModal } from './VimModal';
 
 interface BootTerminalProps {
   session: OperatorSession | null;
@@ -36,7 +38,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [autoCompleteNotice, setAutoCompleteNotice] = useState<string | null>(null);
-
+  const [vfs, setVfs] = useState<VirtualFileSystem>(() => new VirtualFileSystem(session?.username || 'dedsec00'));
+  const [activeVim, setActiveVim] = useState<{ fileName: string; content: string } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamQueueRef = useRef<Array<{ text: string; type: TerminalLine['type']; delay?: number }>>([]);
@@ -277,8 +280,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     if (e.key === 'Tab') {
       e.preventDefault();
       if (loginStep !== 'authenticated') return;
-
-      const res = handleTabCompletion(inputValue, session?.isRoot ?? false);
+      const res = handleTabCompletion(inputValue, session?.isRoot ?? false, vfs);
       if (res.hasAdvanced) {
         setInputValue(res.completedValue);
         setCursorPos(res.completedValue.length);
@@ -369,6 +371,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         }
 
         onSessionChange(newSession);
+        setVfs(new VirtualFileSystem(newSession.username));
         setLoginStep('authenticated');
 
         const authOutput: Array<{ text: string; type: TerminalLine['type']; delay?: number }> = isRoot
@@ -390,13 +393,15 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
       // 3. Authenticated Commands Phase
       if (val.length > 0) {
-        appendImmediateLine(`@${session?.username || 'op'} // TALOS > ${val}`, 'input');
+        appendImmediateLine(`${getPromptText()}${val}`, 'input');
         setHistory((prev) => [...prev, val]);
         setHistoryIndex(-1);
 
-        const result = parseAndExecuteCommand(val, session);
+        const result = parseAndExecuteCommand(val, session, vfs);
 
-        if (val === 'clear') {
+        if (result.openVim) {
+          setActiveVim(result.openVim);
+        } else if (val === 'clear') {
           setLines([]);
         } else if (result.lines.length > 0) {
           // Continuous streaming for command outputs!
@@ -445,9 +450,33 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   };
 
   const getPromptText = () => {
-    if (loginStep === 'username') return 'ENTER OPERATOR ID [Username] > ';
-    if (loginStep === 'password') return 'ENTER ACCESS CIPHER [Password] > ';
-    return `@${session?.username || 'op'} // TALOS > `;
+    if (loginStep === 'username') return 'LOGIN_ID [dedsec00] > ';
+    if (loginStep === 'password') return 'ACCESS_CIPHER [Password] > ';
+    const dispPath = vfs.getDisplayPath();
+    return `${session?.username || 'op'}@talos:${dispPath}$ `;
+  };
+
+  const renderLineContent = (l: TerminalLine) => {
+    if (l.type === 'ascii') {
+      return (
+        <span className="text-endfield-yellow text-glow-yellow font-bold tracking-widest whitespace-pre drop-shadow-[0_0_12px_rgba(255,230,0,0.35)]">
+          {l.text}
+        </span>
+      );
+    }
+    if (l.type === 'input') {
+      return <span className="text-endfield-cyan text-glow-cyan font-mono font-bold">{l.text}</span>;
+    }
+    const tokens = tokenizeText(l.text);
+    return (
+      <span className="break-all whitespace-pre-wrap">
+        {tokens.map((tok, idx) => (
+          <span key={idx} className={tok.className}>
+            {tok.text}
+          </span>
+        ))}
+      </span>
+    );
   };
 
   // Render inline caret position
@@ -532,13 +561,13 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       {/* 1. Historical Output Lines Stream (100% Selectable for Copying) */}
       <div className="space-y-1 select-text">
         {lines.map((l) => (
-          <div key={l.id} className={`flex items-start select-text ${getLineColorClass(l.type)}`}>
+          <div key={l.id} className="flex items-start select-text font-mono leading-relaxed">
             {l.timestamp && (
               <span className="text-endfield-muted text-xs mr-2 shrink-0 select-none">
                 [{l.timestamp}]
               </span>
             )}
-            <span className="break-all whitespace-pre-wrap select-text">{l.text}</span>
+            {renderLineContent(l)}
           </div>
         ))}
       </div>
@@ -574,6 +603,20 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         </div>
       )}
     </div>
-      </div>
+
+    {/* VIM Full-Screen Modal Viewer */}
+    {activeVim && (
+      <VimModal
+        fileName={activeVim.fileName}
+        content={activeVim.content}
+        onClose={() => {
+          setActiveVim(null);
+          setTimeout(() => {
+            inputRef.current?.focus({ preventScroll: true });
+          }, 30);
+        }}
+      />
+    )}
+  </div>
   );
 };
