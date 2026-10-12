@@ -16,14 +16,25 @@ interface BootTerminalProps {
   onCloseDrawer?: () => void;
 }
 
-const ASCII_LOGO = [
-  '  ███████╗███╗   ██╗██████╗ ███████╗██╗███████╗██╗     ██████╗ ',
-  '  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║██╔════╝██║     ██╔══██╗',
-  '  █████╗  ██╔██╗ ██║██║  ██║█████╗  ██║█████╗  ██║     ██║  ██║',
-  '  ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██║██╔══╝  ██║     ██║  ██║',
-  '  ███████╗██║ ╚████║██████╔╝██║     ██║███████╗███████╗██████╔╝',
-  '  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝ ',
-  '    // TALOS-II PROTOCOL GATEWAY // TACTICAL ARCHITECTURE //   ',
+const BOOT_SEQUENCE: Array<{ text: string; type: TerminalLine['type']; delay?: number }> = [
+  { text: '[ 0.000000] TALOS-II SUBTERRA KERNEL 4.19-RT COLD BOOT SEQUENCE...', type: 'system', delay: 45 },
+  { text: '[ 0.038102] CPU ARCH: ARM64 // BUS SPEED: 12.8 Gbps // REGISTERS: OK', type: 'info', delay: 35 },
+  { text: '[ 0.071920] WEBGPU TOPOGRAPHIC SHADER CONTEXT: INITIALIZED [60 FPS]', type: 'info', delay: 35 },
+  { text: '[ 0.114290] SCANLINE RESOLUTION: 1080P // AUDIO SYNTHESIZER: ARMED', type: 'info', delay: 35 },
+  { text: '[ 0.158200] DECRYPTING SECTOR 04 TOPOLOGY & LIDAR CONTOUR MESH...', type: 'warn', delay: 45 },
+  { text: '[ 0.189000] [SYSTEM OVERRIDE DETECTED // RENDERING VECTOR EMBLEM]', type: 'warn', delay: 60 },
+  // ASCII Emblem
+  { text: '  ███████╗███╗   ██╗██████╗ ███████╗██╗███████╗██╗     ██████╗ ', type: 'ascii', delay: 30 },
+  { text: '  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║██╔════╝██║     ██╔══██╗', type: 'ascii', delay: 30 },
+  { text: '  █████╗  ██╔██╗ ██║██║  ██║█████╗  ██║█████╗  ██║     ██║  ██║', type: 'ascii', delay: 30 },
+  { text: '  ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██║██╔══╝  ██║     ██║  ██║', type: 'ascii', delay: 30 },
+  { text: '  ███████╗██║ ╚████║██████╔╝██║     ██║███████╗███████╗██████╔╝', type: 'ascii', delay: 30 },
+  { text: '  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝ ', type: 'ascii', delay: 30 },
+  { text: '    // TALOS-II PROTOCOL GATEWAY // TACTICAL ARCHITECTURE //   ', type: 'ascii', delay: 50 },
+  // Gateway Ready Prompt
+  { text: '================================================================', type: 'system', delay: 35 },
+  { text: '[ACCESS GATEWAY]: Unauthenticated terminal session detected.', type: 'warn', delay: 40 },
+  { text: 'Provisioning guest profile. Enter Operator ID (or admin for root):', type: 'info', delay: 40 },
 ];
 
 export const BootTerminal: React.FC<BootTerminalProps> = ({
@@ -34,93 +45,111 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   onCloseDrawer,
 }) => {
   const [lines, setLines] = useState<TerminalLine[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [isBooting, setIsBooting] = useState<boolean>(!session && !isDrawer);
   const [loginStep, setLoginStep] = useState<'username' | 'password' | 'authenticated'>(
     session ? 'authenticated' : 'username'
   );
   const [tempUsername, setTempUsername] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [autoCompleteNotice, setAutoCompleteNotice] = useState<string | null>(null);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const bootTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const addLine = (text: string, type: TerminalLine['type']) => {
+  // Helper to add lines with timestamps
+  const appendLine = (text: string, type: TerminalLine['type']) => {
     const id = `${Date.now()}-${Math.random()}`;
     const timestamp = new Date().toTimeString().split(' ')[0];
     setLines((prev) => [...prev, { id, text, type, timestamp }]);
   };
 
-  // Initialize terminal stream
+  // Skip boot teleprinter animation and dump all lines immediately
+  const skipBootAnimation = () => {
+    if (!isBooting) return;
+    clearTimeout(bootTimerRef.current);
+
+    const fullLines: TerminalLine[] = BOOT_SEQUENCE.map((b, i) => ({
+      id: `boot-${i}`,
+      text: b.text,
+      type: b.type,
+      timestamp: new Date().toTimeString().split(' ')[0],
+    }));
+
+    setLines(fullLines);
+    setIsBooting(false);
+    tacticalAudio.playPromptBeep();
+  };
+
+  // Run teleprinter boot stream sequence
   useEffect(() => {
-    if (lines.length === 0) {
-      const initialLines: TerminalLine[] = [];
-      ASCII_LOGO.forEach((logoLine, idx) => {
-        initialLines.push({
-          id: `ascii-${idx}`,
-          text: logoLine,
-          type: 'ascii',
-        });
-      });
-
-      initialLines.push({
-        id: 'sys-0',
-        text: 'TALOS-II SUBSURFACE KERNEL 4.19-RT // SECURITY LEVEL 3',
-        type: 'system',
-        timestamp: new Date().toTimeString().split(' ')[0],
-      });
-      initialLines.push({
-        id: 'sys-1',
-        text: 'HARDWARE INTEGRITY: PASS | BUS SPEED: 12.8 Gbps | STATUS: READY',
-        type: 'info',
-        timestamp: new Date().toTimeString().split(' ')[0],
-      });
-
-      if (!session) {
-        initialLines.push({
-          id: 'auth-0',
-          text: '================================================================',
-          type: 'system',
-        });
-        initialLines.push({
-          id: 'auth-1',
-          text: '[ACCESS GATEWAY]: Operator credentials unverified. Provisioning guest profile.',
+    if (session || isDrawer) {
+      // Direct instant mount for drawer or restored session
+      setIsBooting(false);
+      setLines([
+        {
+          id: 'restored-1',
+          text: `[SESSION RESUMED] Active Operator: @${session?.username || 'GUEST'} [${session?.clearance || 'LV.3'}]`,
+          type: session?.isRoot ? 'root' : 'success',
+          timestamp: new Date().toTimeString().split(' ')[0],
+        },
+        {
+          id: 'restored-2',
+          text: "Type 'help' to review command matrix or 'system.connect holotable' to launch.",
           type: 'warn',
-        });
-        initialLines.push({
-          id: 'auth-2',
-          text: 'Please enter your Operator ID (or admin for root authorization):',
-          type: 'info',
-        });
-      } else {
-        initialLines.push({
-          id: 'auth-restored',
-          text: `[SESSION RESUMED] Active Operator: @${session.username} [${session.clearance}]`,
-          type: session.isRoot ? 'root' : 'success',
-        });
-        initialLines.push({
-          id: 'auth-hint',
-          text: "Type 'help' to inspect command matrix or 'system.connect holotable' to launch.",
-          type: 'warn',
-        });
+        },
+      ]);
+      return;
+    }
+
+    let currentIndex = 0;
+    const streamNext = () => {
+      if (currentIndex >= BOOT_SEQUENCE.length) {
+        setIsBooting(false);
+        tacticalAudio.playPromptBeep();
+        return;
       }
 
-      setLines(initialLines);
-    }
+      const item = BOOT_SEQUENCE[currentIndex];
+      const id = `boot-${currentIndex}`;
+      const timestamp = new Date().toTimeString().split(' ')[0];
+
+      setLines((prev) => [...prev, { id, text: item.text, type: item.type, timestamp }]);
+      tacticalAudio.playKeyClick();
+      currentIndex++;
+
+      bootTimerRef.current = setTimeout(streamNext, item.delay || 40);
+    };
+
+    bootTimerRef.current = setTimeout(streamNext, 120);
+    return () => {
+      clearTimeout(bootTimerRef.current);
+    };
   }, []);
 
-  // Auto-scroll to bottom
+  // Auto-scroll on lines / input changes
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [lines, loginStep]);
-
-  // Keep focus on input
-  const handleContainerClick = () => {
-    inputRef.current?.focus();
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [lines, inputValue, loginStep]);
+  // Always keep focus on the active in-line input
+  const handleTerminalClick = () => {
+    if (isBooting) {
+      skipBootAnimation();
+    } else {
+      inputRef.current?.focus();
+    }
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isBooting) {
+      skipBootAnimation();
+      return;
+    }
+
     tacticalAudio.playKeyClick();
 
     // Tab autocomplete
@@ -142,7 +171,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       return;
     }
 
-    // Command history
+    // Command history navigation
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (history.length > 0) {
@@ -167,30 +196,32 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       return;
     }
 
+    // Enter submission: freeze current line in-place and open next line underneath
     if (e.key === 'Enter') {
       e.preventDefault();
       setAutoCompleteNotice(null);
       const val = inputValue.trim();
 
-      // Step 1: Username input
+      // 1. Username Phase
       if (loginStep === 'username') {
         if (!val) {
           tacticalAudio.playDenied();
-          addLine('Error: Operator ID cannot be empty.', 'error');
+          appendLine('Error: Operator ID cannot be empty.', 'error');
           return;
         }
+        // Freeze typed username into the stream
+        appendLine(`ENTER OPERATOR ID [Username] > ${val}`, 'input');
         setTempUsername(val);
-        addLine(`ENTER OPERATOR ID [Username]: ${val}`, 'input');
-        addLine('ENTER ACCESS CIPHER [Password]:', 'info');
         setLoginStep('password');
         setInputValue('');
         tacticalAudio.playPromptBeep();
         return;
       }
 
-      // Step 2: Password input
+      // 2. Password Phase
       if (loginStep === 'password') {
-        addLine(`ENTER ACCESS CIPHER [Password]: ${'*'.repeat(Math.max(val.length, 6))}`, 'input');
+        // Freeze masked password into the stream
+        appendLine(`ENTER ACCESS CIPHER [Password] > ${'*'.repeat(Math.max(val.length, 6))}`, 'input');
         setInputValue('');
 
         // Authenticate credentials
@@ -216,22 +247,23 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
         if (isRoot) {
           tacticalAudio.playSuccess();
-          addLine('[CREDENTIAL RECOGNIZED // OVERRIDE GRANTED]', 'root');
-          addLine(`[SECURITY CLEARANCE: LV.5 ROOT // SUPERVISOR ACCESS]`, 'root');
-          addLine(`WELCOME ROOT OPERATOR @${newSession.username}. UNRESTRICTED PRIVILEGES ENGAGED.`, 'root');
+          appendLine('[CREDENTIAL RECOGNIZED // OVERRIDE GRANTED]', 'root');
+          appendLine(`[CLEARANCE: LV.5 ROOT // ROOT ACCESS TO SYSTEM KERNEL]`, 'root');
+          appendLine(`WELCOME ROOT OPERATOR @${newSession.username}. UNRESTRICTED PRIVILEGES ENGAGED.`, 'root');
         } else {
           tacticalAudio.playSuccess();
-          addLine('[CREDENTIAL VERIFIED // GUEST PROFILE GENERATED]', 'success');
-          addLine(`[CLEARANCE: LV.3 STANDARD] OPERATOR @${newSession.username} AUTHENTICATED.`, 'success');
+          appendLine('[CREDENTIAL VERIFIED // GUEST PROFILE GENERATED]', 'success');
+          appendLine(`[CLEARANCE: LV.3 STANDARD] OPERATOR @${newSession.username} AUTHENTICATED.`, 'success');
         }
 
-        addLine("TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", 'warn');
+        appendLine("TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", 'warn');
         return;
       }
 
-      // Step 3: Authenticated Command execution
+      // 3. Authenticated Commands Phase
       if (val.length > 0) {
-        addLine(`@${session?.username || 'operator'} // TALOS > ${val}`, 'input');
+        // Freeze command into stream
+        appendLine(`@${session?.username || 'op'} // TALOS > ${val}`, 'input');
         setHistory((prev) => [...prev, val]);
         setHistoryIndex(-1);
 
@@ -240,7 +272,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         if (val === 'clear') {
           setLines([]);
         } else {
-          result.lines.forEach((l) => addLine(l.text, l.type));
+          result.lines.forEach((l) => appendLine(l.text, l.type));
         }
 
         if (result.clearSession) {
@@ -253,7 +285,6 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         }
 
         if (result.nextView) {
-          tacticalAudio.playTransition();
           onNavigate(result.nextView);
           if (isDrawer && onCloseDrawer) {
             onCloseDrawer();
@@ -272,7 +303,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       case 'ascii':
         return 'text-endfield-yellow font-bold tracking-widest whitespace-pre';
       case 'system':
-        return 'text-endfield-slate border-b border-endfield-border/40 pb-1 mb-1';
+        return 'text-endfield-slate border-b border-endfield-border/30 pb-0.5 mb-1';
       case 'info':
         return 'text-gray-300';
       case 'success':
@@ -284,38 +315,46 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       case 'root':
         return 'text-endfield-crimson font-mono bg-endfield-crimson/10 px-1 border-l-2 border-endfield-crimson';
       case 'input':
-        return 'text-endfield-cyan font-mono';
+        return 'text-endfield-cyan font-mono font-semibold';
       default:
         return 'text-gray-200';
     }
   };
 
+  const getPromptText = () => {
+    if (loginStep === 'username') return 'ENTER OPERATOR ID [Username] > ';
+    if (loginStep === 'password') return 'ENTER ACCESS CIPHER [Password] > ';
+    return `@${session?.username || 'op'} // TALOS > `;
+  };
+
   return (
     <div
-      onClick={handleContainerClick}
-      className={`font-mono text-sm leading-relaxed overflow-hidden flex flex-col ${
+      ref={containerRef}
+      onClick={handleTerminalClick}
+      className={`font-mono text-xs md:text-sm leading-relaxed overflow-y-auto cursor-text select-text p-4 md:p-8 scrollbar-thin scrollbar-thumb-endfield-border ${
         isDrawer
           ? 'h-full bg-endfield-bg/95 backdrop-blur-md border-b-2 border-endfield-yellow'
-          : 'w-full h-screen bg-endfield-bg text-gray-200 p-4 md:p-8'
+          : 'w-full h-full bg-endfield-bg text-gray-200'
       }`}
     >
-      {/* Terminal Title Bar */}
-      <div className="flex items-center justify-between border-b border-endfield-border pb-2 mb-3 select-none">
+      {/* Top Banner & Skip hint */}
+      <div className="flex items-center justify-between border-b border-endfield-border/60 pb-2 mb-4 select-none">
         <div className="flex items-center space-x-2">
-          <span className="w-3 h-3 bg-endfield-yellow rounded-none inline-block animate-pulse"></span>
+          <span className="w-2.5 h-2.5 bg-endfield-yellow rounded-none inline-block animate-pulse"></span>
           <span className="text-endfield-yellow font-bold tracking-wider text-xs uppercase">
-            {session?.isRoot ? 'ROOT KERNEL CLI // LV.5' : 'END-CLI PROTOCOL TERMINAL v2.4'}
+            {session?.isRoot ? 'ROOT KERNEL TTY // CLEARANCE: LV.5' : 'TALOS-II TTY CONSOLE v2.4'}
           </span>
-          <span className="text-endfield-muted text-xs hidden sm:inline">
-            // STATUS: {loginStep === 'authenticated' ? 'CONNECTED' : 'AUTHENTICATING'}
-          </span>
+          {isBooting && (
+            <span className="text-endfield-cyan text-xs animate-pulse">
+              [BOOT SEQUENCE STREAMING... CLICK ANYWHERE TO SKIP]
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center space-x-3 text-xs">
+        <div className="flex items-center space-x-3 text-xs select-none">
           {session && (
             <button
               onClick={() => {
-                tacticalAudio.playTransition();
                 onNavigate('holotable');
                 if (isDrawer && onCloseDrawer) onCloseDrawer();
               }}
@@ -324,7 +363,6 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
               [LAUNCH HOLOTABLE]
             </button>
           )}
-
           {isDrawer && (
             <button
               onClick={onCloseDrawer}
@@ -336,8 +374,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         </div>
       </div>
 
-      {/* Terminal Output Scroll Area */}
-      <div className="flex-1 overflow-y-auto space-y-1 pr-2 scrollbar-thin scrollbar-thumb-endfield-border">
+      {/* 1. Historical Output Lines Stream */}
+      <div className="space-y-1">
         {lines.map((l) => (
           <div key={l.id} className={`flex items-start ${getLineColorClass(l.type)}`}>
             {l.timestamp && (
@@ -345,49 +383,46 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
                 [{l.timestamp}]
               </span>
             )}
-            <span className="break-all">{l.text}</span>
+            <span className="break-all whitespace-pre-wrap">{l.text}</span>
           </div>
         ))}
-
-        {autoCompleteNotice && (
-          <div className="text-xs text-endfield-cyan bg-endfield-cyan/10 p-1 border-l-2 border-endfield-cyan">
-            {autoCompleteNotice}
-          </div>
-        )}
-
-        <div ref={bottomRef} />
       </div>
 
-      {/* Input Prompt Section */}
-      <div className="pt-3 border-t border-endfield-border flex items-center space-x-2">
-        <span className="text-endfield-yellow font-bold shrink-0 select-none">
-          {loginStep === 'username'
-            ? 'LOGIN_ID >'
-            : loginStep === 'password'
-            ? 'CIPHER_KEY >'
-            : `@${session?.username || 'op'} // TALOS >`}
-        </span>
+      {/* Auto-complete prompt banner if present */}
+      {autoCompleteNotice && (
+        <div className="my-2 text-xs text-endfield-cyan bg-endfield-cyan/10 p-1 border-l-2 border-endfield-cyan">
+          {autoCompleteNotice}
+        </div>
+      )}
 
-        <input
-          ref={inputRef}
-          type={loginStep === 'password' ? 'password' : 'text'}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          spellCheck={false}
-          autoComplete="off"
-          className="flex-1 bg-transparent text-endfield-cyan outline-none border-none font-mono text-sm placeholder-endfield-muted"
-          placeholder={
-            loginStep === 'username'
-              ? 'Enter username (or admin)...'
-              : loginStep === 'password'
-              ? 'Enter password...'
-              : "Type 'help' or 'system.connect holotable' (TAB to complete)..."
-          }
-        />
-        <span className="w-2 h-4 bg-endfield-yellow animate-pulse"></span>
-      </div>
+      {/* 2. REAL IN-LINE ACTIVE TTY INPUT LINE (Directly following the text stream) */}
+      {!isBooting && (
+        <div className="flex items-center flex-wrap pt-1 font-mono text-xs md:text-sm">
+          <span className="text-endfield-yellow font-bold shrink-0 select-none mr-2">
+            {getPromptText()}
+          </span>
+
+          <span className="text-endfield-cyan font-mono font-semibold tracking-wide">
+            {loginStep === 'password' ? '•'.repeat(inputValue.length) : inputValue}
+          </span>
+
+          {/* Authentic Blinking Block Caret █ */}
+          <span className="w-2.5 h-4 bg-endfield-yellow inline-block align-middle ml-0.5 animate-pulse select-none"></span>
+
+          {/* Off-screen/hidden capture input element */}
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            spellCheck={false}
+            autoComplete="off"
+            className="opacity-0 absolute -left-[9999px] -top-[9999px] w-1 h-1 pointer-events-none"
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -246,6 +246,12 @@ export const HolotableCanvas: React.FC<HolotableCanvasProps> = ({ onSelectBeacon
       // Rotate radar sweep
       sweepLine.rotation.y = elapsedTime * 0.45;
 
+      // Elevation emergence growth on mount
+      const animProgress = Math.min(1, elapsedTime / 0.85);
+      const easeProgress = 1 - Math.pow(1 - animProgress, 3);
+      contourGroup.scale.y = Math.max(0.001, easeProgress);
+      beaconsGroup.scale.y = Math.max(0.001, easeProgress);
+
       // Slow terrain rotation
       contourGroup.rotation.y = Math.sin(elapsedTime * 0.1) * 0.05;
       beaconsGroup.rotation.y = Math.sin(elapsedTime * 0.1) * 0.05;

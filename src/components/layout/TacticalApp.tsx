@@ -5,12 +5,15 @@ import { Holotable } from '../holotable/Holotable';
 import { TacticalSurface } from '../surface/TacticalSurface';
 import { HeaderHUD } from './HeaderHUD';
 import { tacticalAudio } from '../audio/TacticalAudio';
+import { ApertureWarp } from '../transition/ApertureWarp';
 
 export const TacticalApp: React.FC = () => {
   const [session, setSession] = useState<OperatorSession | null>(null);
   const [currentView, setCurrentView] = useState<TacticalView>('terminal');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isWarping, setIsWarping] = useState(false);
+  const [pendingView, setPendingView] = useState<TacticalView | null>(null);
 
   // Restore session from sessionStorage on client load
   useEffect(() => {
@@ -51,11 +54,24 @@ export const TacticalApp: React.FC = () => {
   }
 
   const handleNavigate = (view: TacticalView) => {
-    if (view === 'terminal') {
-      setCurrentView('terminal');
+    // Trigger cinematic CRT Aperture Warp when jumping between terminal and holotable/surfaces!
+    if (
+      (currentView === 'terminal' && view !== 'terminal') ||
+      (view === 'terminal' && currentView !== 'terminal')
+    ) {
+      setPendingView(view);
+      setIsWarping(true);
     } else {
       setCurrentView(view);
     }
+  };
+
+  const handleWarpComplete = () => {
+    if (pendingView) {
+      setCurrentView(pendingView);
+      setPendingView(null);
+    }
+    setIsWarping(false);
   };
 
   return (
@@ -113,6 +129,11 @@ export const TacticalApp: React.FC = () => {
           />
         </div>
       )}
+      {/* 4. Cinematic CRT Aperture Warp Transition Engine */}
+      <ApertureWarp
+        isActive={isWarping}
+        onTransitionComplete={handleWarpComplete}
+      />
     </div>
   );
 };
