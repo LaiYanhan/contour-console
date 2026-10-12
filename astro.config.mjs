@@ -4,8 +4,8 @@ import tailwind from '@astrojs/tailwind';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://username.github.io',
-  base: './', // Relative paths allow running on both root and subpath GitHub Pages
+  site: 'https://LaiYanhan.github.io',
+  base: '/contour-console/',
   integrations: [
     react(),
     tailwind({
