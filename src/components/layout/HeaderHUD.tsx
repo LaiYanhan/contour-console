@@ -24,7 +24,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   };
 
   return (
-    <header className="w-full h-14 bg-endfield-bg/85 backdrop-blur-md border-b border-endfield-border/80 px-4 flex items-center justify-between select-none z-30 shrink-0">
+    <header className="relative w-full h-14 bg-[#0C0E12]/92 backdrop-blur-xl border-b border-endfield-border px-4 flex items-center justify-between select-none z-30 shrink-0 shadow-tactical before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent">
       {/* Left: Tactical Brand & Operator Identity */}
       <div className="flex items-center space-x-3">
         {/* Endfield Geometric Monogram */}
@@ -35,7 +35,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
           }}
           className="cursor-pointer flex items-center space-x-2 group"
         >
-          <div className="w-7 h-7 bg-endfield-yellow text-endfield-bg flex items-center justify-center font-bold font-mono text-sm group-hover:bg-endfield-yellow-light transition-colors shadow-glow-yellow-sm">
+          <div className="w-7 h-7 bg-endfield-yellow text-endfield-bg flex items-center justify-center font-black font-mono text-sm group-hover:bg-endfield-yellow-light transition-colors shadow-[0_0_12px_rgba(255,230,0,0.4)]">
             EF
           </div>
           <div className="hidden sm:flex flex-col">
@@ -52,22 +52,22 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
         {session && (
           <div className="flex items-center space-x-2 pl-3 border-l border-endfield-border/80">
             <div className="flex flex-col">
-              <div className="flex items-center space-x-1.5">
-                <span className="text-xs font-mono font-semibold text-endfield-cyan">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-mono font-bold text-endfield-cyan text-glow-cyan">
                   @{session.username}
                 </span>
                 <span
-                  className={`text-[9px] font-mono px-1.5 py-0.2 font-bold uppercase tracking-wider ${
+                  className={`text-[9px] font-mono px-2 py-0.5 font-bold uppercase tracking-wider ${
                     session.isRoot
                       ? 'bg-endfield-crimson text-white shadow-glow-crimson'
-                      : 'bg-endfield-yellow/20 text-endfield-yellow border border-endfield-yellow/40'
+                      : 'bg-endfield-yellow text-endfield-bg font-black'
                   }`}
                 >
                   {session.clearance}
                 </span>
               </div>
               <span className="text-[9px] font-mono text-endfield-muted hidden md:inline">
-                TOKEN: {session.token}
+                TOKEN: {session.token} // STATUS: ACTIVE
               </span>
             </div>
           </div>

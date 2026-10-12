@@ -9,62 +9,100 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #080A0D;
-  color: #E2E8F0;
+  background-color: #0A0C0F;
+  color: #F0F4F8;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
 }
 
+/* CAD Micro Dot Matrix Pattern */
+.cad-grid {
+  background-image: radial-gradient(rgba(45, 58, 77, 0.5) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Authentic CRT Horizontal Scanlines Overlay (Hardware Cathode Ray Tube) */
+.crt-scanlines {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.42) 50%
+  );
+  background-size: 100% 3px;
+  pointer-events: none;
+}
+
+/* Convex CRT Lens Optical Vignette (Simulates physical curvature & dark borders) */
+.crt-vignette {
+  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.92), inset 0 0 40px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+/* Phosphor Text Glow (Hardware phosphor emission luminescence) */
+.text-glow-yellow {
+  text-shadow: 0 0 7px rgba(255, 230, 0, 0.42), 0 0 18px rgba(255, 230, 0, 0.2);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 7px rgba(0, 229, 255, 0.42), 0 0 16px rgba(0, 229, 255, 0.2);
+}
+
+.text-glow-emerald {
+  text-shadow: 0 0 7px rgba(0, 255, 157, 0.42), 0 0 16px rgba(0, 255, 157, 0.2);
+}
+
+/* Endfield Industrial Hazard Warning Stripes */
+.hazard-stripes-yellow {
+  background: repeating-linear-gradient(
+    -45deg,
+    #FFE600,
+    #FFE600 8px,
+    #0A0C0F 8px,
+    #0A0C0F 16px
+  );
+}
+
+.hazard-stripes-subtle {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 230, 0, 0.15),
+    rgba(255, 230, 0, 0.15) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
 /* Custom Tactical Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #11141A;
+  background: #0E1217;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #273142;
+  background: #252F3F;
   border-radius: 0px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #F5C400;
-}
-
-/* Scanline Overlay (Subtle) */
-.scanlines {
-  background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 0, 0, 0.25) 50%
-  );
-  background-size: 100% 4px;
+  background: #FFE600;
 }
 
 @keyframes laserCollapse {
   0% {
     transform: scaleY(100);
-    opacity: 0.9;
+    opacity: 0.95;
   }
-  70% {
+  60% {
     transform: scaleY(3);
     opacity: 1;
   }
   100% {
     transform: scaleY(1);
     opacity: 1;
-  }
-}
-
-@keyframes terminalScan {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 0 100%;
   }
 }

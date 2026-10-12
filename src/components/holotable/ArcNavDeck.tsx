@@ -126,22 +126,27 @@ export const ArcNavDeck: React.FC<ArcNavDeckProps> = ({
         key={item.id}
         onClick={() => handleCardClick(item)}
         onMouseEnter={handleCardHover}
-        className={`group relative flex items-center space-x-3 px-4 py-3 min-w-[140px] md:min-w-[168px] transition-all duration-200 select-none text-left
-          border backdrop-blur-md
+        className={`group relative flex items-center space-x-3 px-4 py-3 min-w-[145px] md:min-w-[172px] transition-all duration-200 select-none text-left
+          border backdrop-blur-xl shadow-tactical-card
+          before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/25 before:to-transparent
           ${
             item.requiresRoot
-              ? 'border-endfield-crimson/50 bg-endfield-crimson/10 hover:bg-endfield-crimson/20 hover:border-endfield-crimson'
+              ? 'border-endfield-crimson/60 bg-[#161218]/90 hover:bg-endfield-crimson/20 hover:border-endfield-crimson shadow-glow-crimson'
               : isActive
-              ? 'border-endfield-yellow bg-endfield-yellow/20 shadow-glow-yellow'
-              : 'border-white/10 bg-endfield-card/80 hover:border-endfield-yellow/70 hover:bg-endfield-yellow/10'
+              ? 'border-endfield-yellow bg-[#1A1812]/95 shadow-glow-yellow'
+              : 'border-endfield-border/90 bg-[#11141B]/85 hover:border-endfield-yellow/80 hover:bg-[#181C26]/90'
           }
         `}
         style={{
           clipPath: isLeft
-            ? 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%)'
-            : 'polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px)',
+            ? 'polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)'
+            : 'polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px)',
         }}
       >
+        {/* Corner Reticle Brackets (⌜ ⌟) */}
+        <span className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-endfield-yellow/80 pointer-events-none"></span>
+        <span className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-endfield-yellow/80 pointer-events-none"></span>
+
         {/* Glow edge indicator */}
         <div
           className={`absolute ${
@@ -150,7 +155,7 @@ export const ArcNavDeck: React.FC<ArcNavDeckProps> = ({
             item.requiresRoot
               ? 'bg-endfield-crimson'
               : isActive
-              ? 'bg-endfield-yellow'
+              ? 'bg-endfield-yellow shadow-[0_0_8px_#ffe600]'
               : 'bg-transparent group-hover:bg-endfield-yellow'
           }`}
         />
@@ -161,7 +166,7 @@ export const ArcNavDeck: React.FC<ArcNavDeckProps> = ({
             item.requiresRoot
               ? 'text-endfield-crimson'
               : isActive
-              ? 'text-endfield-yellow'
+              ? 'text-endfield-yellow text-glow-yellow'
               : 'text-endfield-slate group-hover:text-endfield-yellow'
           }`}
         >
@@ -171,22 +176,25 @@ export const ArcNavDeck: React.FC<ArcNavDeckProps> = ({
         {/* Text information */}
         <div className="flex flex-col">
           <div className="flex items-center space-x-1.5">
-            <span className="font-bold text-sm tracking-wide text-gray-100 group-hover:text-endfield-yellow transition-colors">
+            <span className="font-black text-sm tracking-wide text-gray-100 group-hover:text-endfield-yellow group-hover:text-glow-yellow transition-colors font-sans">
               {item.labelZh}
             </span>
-            <span className="text-[10px] font-mono text-endfield-muted">
+            <span className="text-[10px] font-mono text-endfield-muted font-bold">
               {item.code}
             </span>
           </div>
-          <span
-            className={`text-[9px] font-mono tracking-widest uppercase ${
-              item.requiresRoot
-                ? 'text-endfield-crimson'
-                : 'text-endfield-slate group-hover:text-endfield-yellow-light'
-            }`}
-          >
-            {item.labelEn}
-          </span>
+          <div className="flex items-center space-x-1 mt-0.5">
+            <span className="w-1 h-1 rounded-full bg-endfield-yellow/60 group-hover:bg-endfield-yellow"></span>
+            <span
+              className={`text-[9px] font-mono tracking-widest uppercase font-bold ${
+                item.requiresRoot
+                  ? 'text-endfield-crimson'
+                  : 'text-endfield-slate group-hover:text-endfield-yellow-light'
+              }`}
+            >
+              {item.labelEn}
+            </span>
+          </div>
         </div>
       </button>
     );

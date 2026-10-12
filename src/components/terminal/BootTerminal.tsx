@@ -392,23 +392,23 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const getLineColorClass = (type: TerminalLine['type']) => {
     switch (type) {
       case 'ascii':
-        return 'text-endfield-yellow font-bold tracking-widest whitespace-pre';
+        return 'text-endfield-yellow text-glow-yellow font-bold tracking-widest whitespace-pre drop-shadow-[0_0_12px_rgba(255,230,0,0.35)]';
       case 'system':
-        return 'text-endfield-slate border-b border-endfield-border/30 pb-0.5 mb-1';
+        return 'text-endfield-slate border-b border-endfield-border/60 pb-1 mb-1 font-mono text-[11px]';
       case 'info':
-        return 'text-gray-300';
+        return 'text-[#C5D3E8]';
       case 'success':
-        return 'text-endfield-emerald font-semibold';
+        return 'text-endfield-emerald text-glow-emerald font-semibold';
       case 'warn':
-        return 'text-endfield-yellow font-medium';
+        return 'text-endfield-yellow text-glow-yellow font-medium';
       case 'error':
-        return 'text-endfield-crimson font-bold';
+        return 'text-endfield-crimson font-bold drop-shadow-[0_0_8px_rgba(255,45,70,0.5)]';
       case 'root':
-        return 'text-endfield-crimson font-mono bg-endfield-crimson/10 px-1 border-l-2 border-endfield-crimson';
+        return 'text-endfield-crimson font-mono bg-endfield-crimson/15 px-2 py-0.5 border-l-2 border-endfield-crimson font-bold';
       case 'input':
-        return 'text-endfield-cyan font-mono font-semibold';
+        return 'text-endfield-cyan text-glow-cyan font-mono font-bold';
       default:
-        return 'text-gray-200';
+        return 'text-gray-100';
     }
   };
 
@@ -443,21 +443,31 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     <div
       ref={containerRef}
       onClick={handleTerminalClick}
-      className={`font-mono text-xs md:text-sm leading-relaxed overflow-y-auto cursor-text select-text p-4 md:p-8 scrollbar-thin scrollbar-thumb-endfield-border ${
+      className={`relative font-mono text-xs md:text-sm leading-relaxed overflow-y-auto cursor-text select-text p-4 md:p-8 scrollbar-thin scrollbar-thumb-endfield-border cad-grid ${
         isDrawer
-          ? 'h-full bg-endfield-bg/95 backdrop-blur-md border-b-2 border-endfield-yellow'
+          ? 'h-full bg-endfield-bg/95 backdrop-blur-xl border-b-2 border-endfield-yellow shadow-tactical'
           : 'w-full h-full bg-endfield-bg text-gray-200'
       }`}
     >
-      {/* Top Banner & Status bar */}
-      <div className="flex items-center justify-between border-b border-endfield-border/60 pb-2 mb-4 select-none">
-        <div className="flex items-center space-x-2">
-          <span className="w-2.5 h-2.5 bg-endfield-yellow rounded-none inline-block animate-pulse"></span>
-          <span className="text-endfield-yellow font-bold tracking-wider text-xs uppercase">
-            {session?.isRoot ? 'ROOT KERNEL TTY // CLEARANCE: LV.5' : 'TALOS-II TTY CONSOLE v2.4'}
+      {/* CRT Scanline & Optical Lens Vignette Overlay */}
+      <div className="absolute inset-0 crt-scanlines pointer-events-none z-10" />
+      <div className="absolute inset-0 crt-vignette pointer-events-none z-10" />
+
+      {/* Heavy-duty Industrial TTY Header Bar */}
+      <div className="relative z-20 flex items-center justify-between border-b border-endfield-border pb-2.5 mb-4 select-none bg-endfield-surface/70 px-3 py-1.5 shadow-tactical-card border-l-2 border-l-endfield-yellow">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1.5">
+            <span className="w-2 h-2 rounded-full bg-endfield-emerald shadow-[0_0_8px_#00ff9d] animate-pulse"></span>
+            <span className="text-[10px] font-mono text-endfield-muted tracking-wider">CARRIER_OK</span>
+          </div>
+          <span className="text-endfield-yellow text-glow-yellow font-black tracking-widest text-xs uppercase">
+            {session?.isRoot ? 'ROOT KERNEL TTY // CLEARANCE: LV.5' : 'TALOS-II TTY CONSOLE // TTY1'}
+          </span>
+          <span className="text-endfield-muted text-[10px] hidden sm:inline">
+            [BAUD: 115200 // BUFFER: 64KB // SPEC: AIC-04]
           </span>
           {isStreaming && (
-            <span className="text-endfield-cyan text-xs animate-pulse">
+            <span className="text-endfield-cyan text-glow-cyan text-xs animate-pulse">
               [STREAMING TELEPRINTER... CLICK/KEY TO SKIP]
             </span>
           )}
@@ -470,7 +480,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
                 onNavigate('holotable');
                 if (isDrawer && onCloseDrawer) onCloseDrawer();
               }}
-              className="px-2 py-0.5 bg-endfield-yellow text-endfield-bg font-bold hover:bg-endfield-yellow-light transition-colors"
+              className="px-2.5 py-1 bg-endfield-yellow text-endfield-bg font-bold hover:bg-endfield-yellow-light transition-colors shadow-glow-yellow-sm tracking-wider"
             >
               [LAUNCH HOLOTABLE]
             </button>

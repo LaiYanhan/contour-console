@@ -85,24 +85,29 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
   const meta = getViewMeta();
 
   return (
-    <div className="w-full h-full flex flex-col p-4 md:p-8 overflow-y-auto bg-endfield-bg select-none">
-      {/* 1. Tactical Surface Header Bar */}
-      <div className="flex items-center justify-between border-b-2 border-endfield-yellow pb-3 mb-6 shrink-0">
-        <div className="flex items-center space-x-3">
-          <span className="text-sm font-mono font-bold px-2 py-0.5 bg-endfield-yellow text-endfield-bg">
+    <div className="relative w-full h-full flex flex-col p-4 md:p-8 overflow-y-auto bg-endfield-bg select-none cad-grid">
+      {/* 1. Tactical Surface Armored Header Bar */}
+      <div className="relative flex items-center justify-between border-b-2 border-endfield-yellow pb-3.5 mb-6 shrink-0 bg-[#11141B]/90 p-4 border border-endfield-border shadow-tactical-card">
+        {/* Reticle Corner Brackets */}
+        <span className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-endfield-yellow pointer-events-none"></span>
+        <span className="absolute bottom-1 right-1 w-2 h-2 border-b-2 border-r-2 border-endfield-yellow pointer-events-none"></span>
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
+        <div className="flex items-center space-x-3.5">
+          <span className="text-sm font-mono font-black px-2.5 py-1 bg-endfield-yellow text-endfield-bg shadow-[0_0_10px_rgba(255,230,0,0.4)]">
             {meta.code}
           </span>
           <div className="flex flex-col">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-lg md:text-xl font-bold font-sans text-gray-100 tracking-wide">
+            <div className="flex items-center space-x-2.5">
+              <h2 className="text-lg md:text-xl font-black font-sans text-gray-100 tracking-wide">
                 {meta.titleZh}
               </h2>
-              <span className="text-xs font-mono text-endfield-yellow font-semibold tracking-wider">
+              <span className="text-xs font-mono text-endfield-yellow text-glow-yellow font-bold tracking-widest uppercase">
                 {meta.titleEn}
               </span>
             </div>
-            <p className="text-xs font-mono text-endfield-slate">
-              {meta.desc}
+            <p className="text-xs font-mono text-endfield-slate mt-0.5">
+              {meta.desc} // AIC_STATUS: OK
             </p>
           </div>
         </div>
@@ -113,13 +118,16 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
             tacticalAudio.playTransition();
             onExit();
           }}
-          className="flex items-center space-x-2 px-3 py-1.5 bg-endfield-card hover:bg-endfield-yellow hover:text-endfield-bg text-endfield-slate border border-endfield-border hover:border-endfield-yellow transition-all duration-200 group text-xs font-mono font-bold"
+          className="relative flex items-center space-x-2 px-3.5 py-2 bg-[#161B24] hover:bg-endfield-yellow hover:text-endfield-bg text-endfield-slate border border-endfield-border hover:border-endfield-yellow transition-all duration-200 group text-xs font-mono font-bold shadow-tactical-card"
+          style={{
+            clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)',
+          }}
         >
           <span>返回沙盘</span>
-          <span className="bg-endfield-bg/60 group-hover:bg-endfield-bg group-hover:text-endfield-yellow text-gray-300 px-1 text-[10px]">
+          <span className="bg-endfield-bg/70 group-hover:bg-endfield-bg group-hover:text-endfield-yellow text-gray-300 px-1.5 text-[10px]">
             ESC
           </span>
-          <svg className="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2">
+          <svg className="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

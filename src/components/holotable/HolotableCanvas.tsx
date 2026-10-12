@@ -43,9 +43,34 @@ export const HolotableCanvas: React.FC<HolotableCanvasProps> = ({ onSelectBeacon
       return Math.max(0, (wave1 + wave2 + wave3 + centerPeak) * falloff);
     };
 
+    // 2.5 Physical Table Disc Base (Tangible frosted acrylic disc)
+    const tableDiscGroup = new THREE.Group();
+    const discGeo = new THREE.CylinderGeometry(7.6, 7.8, 0.25, 64);
+    discGeo.translate(0, -0.15, 0);
+    const discMat = new THREE.MeshBasicMaterial({
+      color: 0x0c0e12,
+      transparent: true,
+      opacity: 0.92,
+    });
+    tableDiscGroup.add(new THREE.Mesh(discGeo, discMat));
+
+    // Outer Laser Rim Ring
+    const rimGeo = new THREE.RingGeometry(7.5, 7.7, 64);
+    rimGeo.rotateX(-Math.PI / 2);
+    const rimMat = new THREE.MeshBasicMaterial({
+      color: 0xffe600,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.55,
+    });
+    const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+    rimMesh.position.y = 0.01;
+    tableDiscGroup.add(rimMesh);
+    scene.add(tableDiscGroup);
+
     // 3. Generate Layered Horizontal Contour Slice Rings
     const contourGroup = new THREE.Group();
-    const levels = 22; // 22 contour height layers
+    const levels = 24; // 24 contour height layers
     const resolution = 180; // points per slice
     const radius = 7.2;
 
@@ -96,6 +121,25 @@ export const HolotableCanvas: React.FC<HolotableCanvasProps> = ({ onSelectBeacon
       const line = new THREE.Line(geometry, material);
       contourGroup.add(line);
     }
+
+    // Radial elevation ribs connecting mountain contours
+    for (let rIdx = 0; rIdx < 12; rIdx++) {
+      const angle = (rIdx / 12) * Math.PI * 2;
+      const ribPts: THREE.Vector3[] = [];
+      for (let dist = 0.2; dist <= 7.2; dist += 0.35) {
+        const px = Math.cos(angle) * dist;
+        const pz = Math.sin(angle) * dist;
+        const py = getElevation(px, pz);
+        ribPts.push(new THREE.Vector3(px, py, pz));
+      }
+      const ribGeo = new THREE.BufferGeometry().setFromPoints(ribPts);
+      const ribMat = new THREE.LineBasicMaterial({
+        color: 0xd97706,
+        transparent: true,
+        opacity: 0.25,
+      });
+      contourGroup.add(new THREE.Line(ribGeo, ribMat));
+    }
     scene.add(contourGroup);
 
     // 4. Subtle Base Radar Grid (Concentric Rings & Radial Azimuth Spokes)
@@ -145,27 +189,54 @@ export const HolotableCanvas: React.FC<HolotableCanvasProps> = ({ onSelectBeacon
 
     beaconDefs.forEach((b) => {
       const elev = getElevation(b.x, b.z);
-      // Beacon vertical cylinder beam
+      // Inner concentrated core beam
       const cylinderGeo = new THREE.CylinderGeometry(0.04, 0.08, b.height, 16);
       cylinderGeo.translate(0, b.height / 2, 0);
       const cylinderMat = new THREE.MeshBasicMaterial({
         color: b.color,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.85,
         blending: THREE.AdditiveBlending,
       });
       const cylinder = new THREE.Mesh(cylinderGeo, cylinderMat);
       cylinder.position.set(b.x, elev, b.z);
       beaconsGroup.add(cylinder);
 
-      // Beacon ring target base on terrain
-      const targetRingGeo = new THREE.RingGeometry(0.15, 0.35, 24);
-      targetRingGeo.rotateX(-Math.PI / 2);
-      const targetRingMat = new THREE.MeshBasicMaterial({
+      // Outer translucent glow falloff cylinder
+      const outerCylinderGeo = new THREE.CylinderGeometry(0.12, 0.24, b.height, 16);
+      outerCylinderGeo.translate(0, b.height / 2, 0);
+      const outerCylinderMat = new THREE.MeshBasicMaterial({
+        color: b.color,
+        transparent: true,
+        opacity: 0.25,
+        blending: THREE.AdditiveBlending,
+      });
+      const outerCylinder = new THREE.Mesh(outerCylinderGeo, outerCylinderMat);
+      outerCylinder.position.set(b.x, elev, b.z);
+      beaconsGroup.add(outerCylinder);
+
+      // Ground emission halo (eliminates floating look)
+      const haloGeo = new THREE.RingGeometry(0.35, 1.1, 32);
+      haloGeo.rotateX(-Math.PI / 2);
+      const haloMat = new THREE.MeshBasicMaterial({
         color: b.color,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.45,
+        blending: THREE.AdditiveBlending,
+      });
+      const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+      haloMesh.position.set(b.x, elev + 0.02, b.z);
+      beaconsGroup.add(haloMesh);
+
+      // Beacon ring target base on terrain
+      const targetRingGeo = new THREE.RingGeometry(0.12, 0.32, 24);
+      targetRingGeo.rotateX(-Math.PI / 2);
+      const targetRingMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.95,
       });
       const targetRing = new THREE.Mesh(targetRingGeo, targetRingMat);
       targetRing.position.set(b.x, elev + 0.05, b.z);

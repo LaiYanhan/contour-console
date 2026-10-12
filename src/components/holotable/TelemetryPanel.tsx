@@ -14,34 +14,39 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   return (
     <div className="w-full flex flex-col md:flex-row items-center justify-between px-4 md:px-8 py-3 select-none pointer-events-auto z-20 shrink-0 gap-3">
       {/* 1. Left Telemetry Module (Image #1 1:1 match) */}
-      <div className="flex flex-col bg-endfield-surface/90 border border-endfield-border p-2.5 min-w-[260px] md:min-w-[320px] backdrop-blur-md">
+      <div className="relative flex flex-col bg-[#11141B]/95 border border-endfield-border p-3 min-w-[270px] md:min-w-[340px] backdrop-blur-xl shadow-tactical-card">
+        {/* Reticle Corner Brackets */}
+        <span className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-endfield-yellow/80 pointer-events-none"></span>
+        <span className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-endfield-yellow/80 pointer-events-none"></span>
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
         {/* Row 1: North Pipeline Deep Crater */}
-        <div className="flex items-center justify-between py-1 border-b border-endfield-border/60 text-xs font-mono">
+        <div className="flex items-center justify-between py-1.5 border-b border-endfield-border/60 text-xs font-mono">
           <div className="flex items-center space-x-2">
-            <div className="w-2.5 h-2.5 bg-endfield-yellow"></div>
-            <span className="text-gray-200 font-bold">北部管线深坑</span>
+            <div className="w-2.5 h-2.5 bg-endfield-yellow shadow-[0_0_6px_#ffe600]"></div>
+            <span className="text-gray-100 font-bold">北部管线深坑</span>
           </div>
           <div className="flex items-center space-x-3 text-[11px]">
-            <span className="text-endfield-yellow">⚡ 14.4K/15K</span>
-            <span className="text-endfield-cyan">⚙ 4200 O/MIN</span>
+            <span className="text-endfield-yellow font-bold">⚡ 14.4K/15K</span>
+            <span className="text-endfield-cyan font-bold">⚙ 4200 O/MIN</span>
           </div>
         </div>
 
         {/* Row 2: Alkali Land */}
-        <div className="flex items-center justify-between py-1 text-xs font-mono">
+        <div className="flex items-center justify-between py-1.5 text-xs font-mono">
           <div className="flex items-center space-x-2">
-            <div className="w-2.5 h-2.5 bg-gray-400"></div>
-            <span className="text-gray-300">大盘碱地</span>
+            <div className="w-2.5 h-2.5 bg-endfield-slate"></div>
+            <span className="text-gray-200">大盘碱地</span>
           </div>
           <div className="flex items-center space-x-3 text-[11px]">
-            <span className="text-endfield-yellow">⚡ 14.4K/15K</span>
-            <span className="text-endfield-cyan">⚙ 4200 O/MIN</span>
+            <span className="text-endfield-yellow font-bold">⚡ 14.4K/15K</span>
+            <span className="text-endfield-cyan font-bold">⚙ 4200 O/MIN</span>
           </div>
         </div>
 
-        <div className="text-[9px] font-mono text-endfield-muted flex justify-between pt-1">
-          <span>FACTORY_NET: TALOS_NODE_04</span>
-          <span className="text-endfield-emerald">● GRID_STABLE</span>
+        <div className="text-[9px] font-mono text-endfield-slate flex justify-between pt-1 border-t border-endfield-border/40">
+          <span>AIC_NETWORK: TALOS_NODE_04</span>
+          <span className="text-endfield-emerald font-bold">● GRID_STABLE [100%]</span>
         </div>
       </div>
 
@@ -52,26 +57,29 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             tacticalAudio.playTransition();
             onDeploy();
           }}
-          className="group relative flex items-center bg-endfield-yellow hover:bg-endfield-yellow-light text-endfield-bg transition-all duration-200 shadow-glow-yellow px-6 py-2.5"
+          className="group relative flex items-center bg-endfield-yellow hover:bg-endfield-yellow-light text-endfield-bg transition-all duration-200 shadow-glow-yellow px-7 py-3 font-sans"
           style={{
-            clipPath: 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)',
+            clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)',
           }}
         >
-          {/* Geometric Endfield Icon */}
-          <div className="w-6 h-6 mr-3 flex items-center justify-center font-black font-mono text-base border-2 border-endfield-bg">
+          {/* Mini Hazard Warning Stripes Tab on Left */}
+          <div className="absolute left-0 top-0 bottom-0 w-2.5 hazard-stripes-yellow opacity-85" />
+
+          {/* Geometric Endfield Monogram */}
+          <div className="w-6 h-6 ml-2 mr-3 flex items-center justify-center font-black font-mono text-sm border-2 border-endfield-bg bg-endfield-bg text-endfield-yellow">
             EF
           </div>
 
-          <div className="flex flex-col text-left mr-6">
-            <span className="text-base font-bold font-sans tracking-wider leading-none text-endfield-bg">
+          <div className="flex flex-col text-left mr-7">
+            <span className="text-lg font-black tracking-wider leading-none text-endfield-bg">
               四号谷地
             </span>
-            <span className="text-[9px] font-mono font-bold tracking-widest text-endfield-bg/80">
+            <span className="text-[9px] font-mono font-bold tracking-[0.25em] text-endfield-bg/85 mt-0.5">
               VALLEY IV // SECTOR_04
             </span>
           </div>
 
-          <div className="border-l border-endfield-bg/40 pl-4 flex items-center space-x-1.5 font-bold font-mono tracking-widest text-sm text-endfield-bg">
+          <div className="border-l-2 border-endfield-bg/40 pl-4 flex items-center space-x-1.5 font-bold font-mono tracking-widest text-sm text-endfield-bg">
             <span>部署</span>
             <span className="group-hover:translate-x-1 transition-transform">→</span>
           </div>
@@ -84,8 +92,12 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           tacticalAudio.playTransition();
           onNavigate('breach');
         }}
-        className="cursor-pointer group flex items-center bg-endfield-surface/90 border border-endfield-yellow/40 hover:border-endfield-yellow p-2.5 min-w-[240px] md:min-w-[280px] backdrop-blur-md transition-all shadow-glow-yellow-sm"
+        className="relative cursor-pointer group flex items-center bg-[#11141B]/95 border border-endfield-yellow/50 hover:border-endfield-yellow p-3 min-w-[250px] md:min-w-[290px] backdrop-blur-xl transition-all shadow-tactical-card"
       >
+        {/* Reticle Corner Brackets */}
+        <span className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-endfield-yellow/80 pointer-events-none"></span>
+        <span className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-endfield-yellow/80 pointer-events-none"></span>
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
         {/* Warning Badge */}
         <div className="w-10 h-10 bg-endfield-yellow/20 border border-endfield-yellow flex flex-col items-center justify-center mr-3 shrink-0">
           <span className="text-endfield-yellow text-xs font-bold font-mono">NEW</span>
