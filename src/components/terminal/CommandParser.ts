@@ -272,24 +272,47 @@ export function parseAndExecuteCommand(
   };
 }
 
-export function getAutocompleteCandidates(
-  partialInput: string,
+export interface AutocompleteResult {
+  completedValue: string;
+  candidates: string[];
+  hasAdvanced: boolean;
+  isSingleMatch: boolean;
+}
+
+export function computeLcp(strings: string[]): string {
+  if (strings.length === 0) return '';
+  if (strings.length === 1) return strings[0];
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (!strings[i].toLowerCase().startsWith(prefix.toLowerCase())) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === '') return '';
+    }
+  }
+  return prefix;
+}
+
+export function handleTabCompletion(
+  rawInput: string,
   isRoot: boolean
-): string[] {
-  const p = partialInput.trim().toLowerCase();
-  if (p.length === 0) return [];
+): AutocompleteResult {
+  const trimmed = rawInput.trim().toLowerCase();
+  if (!trimmed) {
+    return { completedValue: rawInput, candidates: [], hasAdvanced: false, isSingleMatch: false };
+  }
 
   const candidates: string[] = [];
   COMMAND_REGISTRY.forEach((cmd) => {
     if (cmd.requiresRoot && !isRoot) return;
-    if (cmd.command.toLowerCase().startsWith(p)) {
+    if (cmd.command.toLowerCase().startsWith(trimmed)) {
       candidates.push(cmd.command);
     }
   });
 
-  // Also suggest navigate.to sub-targets
-  if (p.startsWith('navigate.to ')) {
-    const sub = p.replace('navigate.to ', '');
+  // Sub-targets for navigate.to
+  const navPrefix = 'navigate.to ';
+  if (trimmed.startsWith(navPrefix)) {
+    const sub = trimmed.slice(navPrefix.length);
     const targets = ['operator', 'squads', 'comms', 'archives', 'breach'];
     if (isRoot) targets.push('kernel');
     targets.forEach((t) => {
@@ -298,6 +321,33 @@ export function getAutocompleteCandidates(
       }
     });
   }
+  const seen: Record<string, true> = {};
+  const uniqueCandidates = candidates.filter((item) => {
+    if (seen[item]) return false;
+    seen[item] = true;
+    return true;
+  });
+  if (uniqueCandidates.length === 0) {
+    return { completedValue: rawInput, candidates: [], hasAdvanced: false, isSingleMatch: false };
+  }
 
-  return candidates;
+  if (uniqueCandidates.length === 1) {
+    const single = uniqueCandidates[0];
+    return {
+      completedValue: single,
+      candidates: uniqueCandidates,
+      hasAdvanced: single.toLowerCase() !== trimmed,
+      isSingleMatch: true,
+    };
+  }
+
+  const lcp = computeLcp(uniqueCandidates);
+  const hasAdvanced = lcp.length > trimmed.length;
+
+  return {
+    completedValue: hasAdvanced ? lcp : rawInput,
+    candidates: uniqueCandidates,
+    hasAdvanced,
+    isSingleMatch: false,
+  };
 }

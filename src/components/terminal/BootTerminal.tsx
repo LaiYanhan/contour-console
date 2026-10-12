@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { OperatorSession, TerminalLine, TacticalView } from '../../types/tactical';
 import {
   parseAndExecuteCommand,
-  getAutocompleteCandidates,
+  handleTabCompletion,
   hashPassword,
   ADMIN_CONFIG,
 } from './CommandParser';
@@ -17,24 +17,24 @@ interface BootTerminalProps {
 }
 
 const BOOT_SEQUENCE: Array<{ text: string; type: TerminalLine['type']; delay?: number }> = [
-  { text: '[ 0.000000] TALOS-II SUBTERRA KERNEL 4.19-RT COLD BOOT SEQUENCE...', type: 'system', delay: 45 },
-  { text: '[ 0.038102] CPU ARCH: ARM64 // BUS SPEED: 12.8 Gbps // REGISTERS: OK', type: 'info', delay: 35 },
-  { text: '[ 0.071920] WEBGPU TOPOGRAPHIC SHADER CONTEXT: INITIALIZED [60 FPS]', type: 'info', delay: 35 },
-  { text: '[ 0.114290] SCANLINE RESOLUTION: 1080P // AUDIO SYNTHESIZER: ARMED', type: 'info', delay: 35 },
-  { text: '[ 0.158200] DECRYPTING SECTOR 04 TOPOLOGY & LIDAR CONTOUR MESH...', type: 'warn', delay: 45 },
-  { text: '[ 0.189000] [SYSTEM OVERRIDE DETECTED // RENDERING VECTOR EMBLEM]', type: 'warn', delay: 60 },
+  { text: '[ 0.000000] TALOS-II SUBTERRA KERNEL 4.19-RT COLD BOOT SEQUENCE...', type: 'system', delay: 40 },
+  { text: '[ 0.038102] CPU ARCH: ARM64 // BUS SPEED: 12.8 Gbps // REGISTERS: OK', type: 'info', delay: 30 },
+  { text: '[ 0.071920] WEBGPU TOPOGRAPHIC SHADER CONTEXT: INITIALIZED [60 FPS]', type: 'info', delay: 30 },
+  { text: '[ 0.114290] SCANLINE RESOLUTION: 1080P // AUDIO SYNTHESIZER: ARMED', type: 'info', delay: 30 },
+  { text: '[ 0.158200] DECRYPTING SECTOR 04 TOPOLOGY & LIDAR CONTOUR MESH...', type: 'warn', delay: 35 },
+  { text: '[ 0.189000] [SYSTEM OVERRIDE DETECTED // RENDERING VECTOR EMBLEM]', type: 'warn', delay: 50 },
   // ASCII Emblem
-  { text: '  ███████╗███╗   ██╗██████╗ ███████╗██╗███████╗██╗     ██████╗ ', type: 'ascii', delay: 30 },
-  { text: '  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║██╔════╝██║     ██╔══██╗', type: 'ascii', delay: 30 },
-  { text: '  █████╗  ██╔██╗ ██║██║  ██║█████╗  ██║█████╗  ██║     ██║  ██║', type: 'ascii', delay: 30 },
-  { text: '  ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██║██╔══╝  ██║     ██║  ██║', type: 'ascii', delay: 30 },
-  { text: '  ███████╗██║ ╚████║██████╔╝██║     ██║███████╗███████╗██████╔╝', type: 'ascii', delay: 30 },
-  { text: '  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝ ', type: 'ascii', delay: 30 },
-  { text: '    // TALOS-II PROTOCOL GATEWAY // TACTICAL ARCHITECTURE //   ', type: 'ascii', delay: 50 },
+  { text: '  ███████╗███╗   ██╗██████╗ ███████╗██╗███████╗██╗     ██████╗ ', type: 'ascii', delay: 25 },
+  { text: '  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║██╔════╝██║     ██╔══██╗', type: 'ascii', delay: 25 },
+  { text: '  █████╗  ██╔██╗ ██║██║  ██║█████╗  ██║█████╗  ██║     ██║  ██║', type: 'ascii', delay: 25 },
+  { text: '  ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██║██╔══╝  ██║     ██║  ██║', type: 'ascii', delay: 25 },
+  { text: '  ███████╗██║ ╚████║██████╔╝██║     ██║███████╗███████╗██████╔╝', type: 'ascii', delay: 25 },
+  { text: '  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝ ', type: 'ascii', delay: 25 },
+  { text: '    // TALOS-II PROTOCOL GATEWAY // TACTICAL ARCHITECTURE //   ', type: 'ascii', delay: 45 },
   // Gateway Ready Prompt
-  { text: '================================================================', type: 'system', delay: 35 },
-  { text: '[ACCESS GATEWAY]: Unauthenticated terminal session detected.', type: 'warn', delay: 40 },
-  { text: 'Provisioning guest profile. Enter Operator ID (or admin for root):', type: 'info', delay: 40 },
+  { text: '================================================================', type: 'system', delay: 30 },
+  { text: '[ACCESS GATEWAY]: Unauthenticated terminal session detected.', type: 'warn', delay: 35 },
+  { text: 'Provisioning guest profile. Enter Operator ID (or admin for root):', type: 'info', delay: 35 },
 ];
 
 export const BootTerminal: React.FC<BootTerminalProps> = ({
@@ -45,49 +45,112 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   onCloseDrawer,
 }) => {
   const [lines, setLines] = useState<TerminalLine[]>([]);
-  const [isBooting, setIsBooting] = useState<boolean>(!session && !isDrawer);
+  const [isStreaming, setIsStreaming] = useState<boolean>(!session && !isDrawer);
   const [loginStep, setLoginStep] = useState<'username' | 'password' | 'authenticated'>(
     session ? 'authenticated' : 'username'
   );
   const [tempUsername, setTempUsername] = useState('');
   const [inputValue, setInputValue] = useState('');
+  const [cursorPos, setCursorPos] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [autoCompleteNotice, setAutoCompleteNotice] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const bootTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const streamQueueRef = useRef<Array<{ text: string; type: TerminalLine['type']; delay?: number }>>([]);
+  const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingNavRef = useRef<TacticalView | null>(null);
 
-  // Helper to add lines with timestamps
-  const appendLine = (text: string, type: TerminalLine['type']) => {
+  // Directly append a line to buffer without animation
+  const appendImmediateLine = (text: string, type: TerminalLine['type']) => {
     const id = `${Date.now()}-${Math.random()}`;
     const timestamp = new Date().toTimeString().split(' ')[0];
     setLines((prev) => [...prev, { id, text, type, timestamp }]);
   };
 
-  // Skip boot teleprinter animation and dump all lines immediately
-  const skipBootAnimation = () => {
-    if (!isBooting) return;
-    clearTimeout(bootTimerRef.current);
+  // Run next item from stream queue
+  const processStreamQueue = () => {
+    if (streamQueueRef.current.length === 0) {
+      streamTimerRef.current = null;
+      setIsStreaming(false);
+      if (pendingNavRef.current) {
+        const dest = pendingNavRef.current;
+        pendingNavRef.current = null;
+        onNavigate(dest);
+        if (isDrawer && onCloseDrawer) onCloseDrawer();
+      } else {
+        tacticalAudio.playPromptBeep();
+      }
+      return;
+    }
 
-    const fullLines: TerminalLine[] = BOOT_SEQUENCE.map((b, i) => ({
-      id: `boot-${i}`,
-      text: b.text,
-      type: b.type,
-      timestamp: new Date().toTimeString().split(' ')[0],
-    }));
+    const next = streamQueueRef.current.shift()!;
+    const id = `${Date.now()}-${Math.random()}`;
+    const timestamp = new Date().toTimeString().split(' ')[0];
 
-    setLines(fullLines);
-    setIsBooting(false);
-    tacticalAudio.playPromptBeep();
+    setLines((prev) => [...prev, { id, text: next.text, type: next.type, timestamp }]);
+    tacticalAudio.playKeyClick();
+
+    const delay = next.delay ?? 22; // 22ms default for command outputs
+    streamTimerRef.current = setTimeout(processStreamQueue, delay);
   };
 
-  // Run teleprinter boot stream sequence
+  // Stream an array of lines line-by-line
+  const streamLines = (
+    newItems: Array<{ text: string; type: TerminalLine['type']; delay?: number }>,
+    nextView?: TacticalView
+  ) => {
+    if (newItems.length === 0) {
+      if (nextView) {
+        onNavigate(nextView);
+        if (isDrawer && onCloseDrawer) onCloseDrawer();
+      }
+      return;
+    }
+
+    if (nextView) pendingNavRef.current = nextView;
+    streamQueueRef.current = [...streamQueueRef.current, ...newItems];
+    setIsStreaming(true);
+
+    if (!streamTimerRef.current) {
+      processStreamQueue();
+    }
+  };
+
+  // Instant skip for all currently streaming output
+  const skipStreaming = () => {
+    clearTimeout(streamTimerRef.current);
+    streamTimerRef.current = null;
+
+    if (streamQueueRef.current.length > 0) {
+      const timestamp = new Date().toTimeString().split(' ')[0];
+      const flushed: TerminalLine[] = streamQueueRef.current.map((item) => ({
+        id: `${Date.now()}-${Math.random()}`,
+        text: item.text,
+        type: item.type,
+        timestamp,
+      }));
+      streamQueueRef.current = [];
+      setLines((prev) => [...prev, ...flushed]);
+    }
+
+    setIsStreaming(false);
+
+    if (pendingNavRef.current) {
+      const dest = pendingNavRef.current;
+      pendingNavRef.current = null;
+      onNavigate(dest);
+      if (isDrawer && onCloseDrawer) onCloseDrawer();
+    } else {
+      tacticalAudio.playPromptBeep();
+    }
+  };
+
+  // Initialize terminal stream on mount
   useEffect(() => {
     if (session || isDrawer) {
-      // Direct instant mount for drawer or restored session
-      setIsBooting(false);
+      setIsStreaming(false);
       setLines([
         {
           id: 'restored-1',
@@ -104,66 +167,93 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       return;
     }
 
-    let currentIndex = 0;
-    const streamNext = () => {
-      if (currentIndex >= BOOT_SEQUENCE.length) {
-        setIsBooting(false);
-        tacticalAudio.playPromptBeep();
-        return;
-      }
+    // Cold boot: stream initial boot sequence
+    streamLines(BOOT_SEQUENCE);
 
-      const item = BOOT_SEQUENCE[currentIndex];
-      const id = `boot-${currentIndex}`;
-      const timestamp = new Date().toTimeString().split(' ')[0];
-
-      setLines((prev) => [...prev, { id, text: item.text, type: item.type, timestamp }]);
-      tacticalAudio.playKeyClick();
-      currentIndex++;
-
-      bootTimerRef.current = setTimeout(streamNext, item.delay || 40);
-    };
-
-    bootTimerRef.current = setTimeout(streamNext, 120);
     return () => {
-      clearTimeout(bootTimerRef.current);
+      clearTimeout(streamTimerRef.current);
     };
   }, []);
 
-  // Auto-scroll on lines / input changes
+  // Auto-scroll on lines or input changes
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [lines, inputValue, loginStep]);
-  // Always keep focus on the active in-line input
+  }, [lines, inputValue, loginStep, isStreaming]);
+
+  // Selection-aware click handler: if user highlighted text to copy, do not steal focus!
   const handleTerminalClick = () => {
-    if (isBooting) {
-      skipBootAnimation();
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) {
+      return;
+    }
+
+    if (isStreaming) {
+      skipStreaming();
     } else {
       inputRef.current?.focus();
     }
   };
 
+  // Synchronize cursor position with input element
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    setCursorPos(e.target.selectionStart ?? e.target.value.length);
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isBooting) {
-      skipBootAnimation();
+    // If stream is running, any keypress skips streaming instantly
+    if (isStreaming) {
+      skipStreaming();
       return;
+    }
+
+    // Allow standard copy shortcuts without interference
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        return; // Native clipboard copy
+      }
     }
 
     tacticalAudio.playKeyClick();
 
-    // Tab autocomplete
+    // Caret navigation keys
+    if (e.key === 'ArrowLeft') {
+      setTimeout(() => {
+        if (inputRef.current) setCursorPos(inputRef.current.selectionStart ?? 0);
+      }, 0);
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      setTimeout(() => {
+        if (inputRef.current) setCursorPos(inputRef.current.selectionStart ?? inputValue.length);
+      }, 0);
+      return;
+    }
+    if (e.key === 'Home') {
+      setTimeout(() => setCursorPos(0), 0);
+      return;
+    }
+    if (e.key === 'End') {
+      setTimeout(() => setCursorPos(inputValue.length), 0);
+      return;
+    }
+
+    // LCP (Longest Common Prefix) Tab Autocompletion
     if (e.key === 'Tab') {
       e.preventDefault();
       if (loginStep !== 'authenticated') return;
 
-      const candidates = getAutocompleteCandidates(inputValue, session?.isRoot ?? false);
-      if (candidates.length === 1) {
-        setInputValue(candidates[0]);
+      const res = handleTabCompletion(inputValue, session?.isRoot ?? false);
+      if (res.hasAdvanced) {
+        setInputValue(res.completedValue);
+        setCursorPos(res.completedValue.length);
         setAutoCompleteNotice(null);
         tacticalAudio.playPromptBeep();
-      } else if (candidates.length > 1) {
-        setAutoCompleteNotice(`Suggestions: ${candidates.join('  |  ')}`);
+      } else if (res.candidates.length > 1) {
+        setAutoCompleteNotice(`Suggestions: ${res.candidates.join('  |  ')}`);
         tacticalAudio.playPromptBeep();
       } else {
         setAutoCompleteNotice('No matching tactical command');
@@ -171,14 +261,16 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       return;
     }
 
-    // Command history navigation
+    // Command history
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (history.length > 0) {
         const nextIdx = historyIndex + 1;
         if (nextIdx < history.length) {
           setHistoryIndex(nextIdx);
-          setInputValue(history[history.length - 1 - nextIdx]);
+          const val = history[history.length - 1 - nextIdx];
+          setInputValue(val);
+          setCursorPos(val.length);
         }
       }
       return;
@@ -188,15 +280,18 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       if (historyIndex > 0) {
         const nextIdx = historyIndex - 1;
         setHistoryIndex(nextIdx);
-        setInputValue(history[history.length - 1 - nextIdx]);
+        const val = history[history.length - 1 - nextIdx];
+        setInputValue(val);
+        setCursorPos(val.length);
       } else if (historyIndex === 0) {
         setHistoryIndex(-1);
         setInputValue('');
+        setCursorPos(0);
       }
       return;
     }
 
-    // Enter submission: freeze current line in-place and open next line underneath
+    // Enter key: freeze current line in-place, then stream responses
     if (e.key === 'Enter') {
       e.preventDefault();
       setAutoCompleteNotice(null);
@@ -206,25 +301,24 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       if (loginStep === 'username') {
         if (!val) {
           tacticalAudio.playDenied();
-          appendLine('Error: Operator ID cannot be empty.', 'error');
+          streamLines([{ text: 'Error: Operator ID cannot be empty.', type: 'error' }]);
           return;
         }
-        // Freeze typed username into the stream
-        appendLine(`ENTER OPERATOR ID [Username] > ${val}`, 'input');
+        appendImmediateLine(`ENTER OPERATOR ID [Username] > ${val}`, 'input');
         setTempUsername(val);
         setLoginStep('password');
         setInputValue('');
+        setCursorPos(0);
         tacticalAudio.playPromptBeep();
         return;
       }
 
       // 2. Password Phase
       if (loginStep === 'password') {
-        // Freeze masked password into the stream
-        appendLine(`ENTER ACCESS CIPHER [Password] > ${'*'.repeat(Math.max(val.length, 6))}`, 'input');
+        appendImmediateLine(`ENTER ACCESS CIPHER [Password] > ${'•'.repeat(Math.max(val.length, 6))}`, 'input');
         setInputValue('');
+        setCursorPos(0);
 
-        // Authenticate credentials
         const hashed = await hashPassword(val);
         const isRoot =
           tempUsername.toLowerCase() === ADMIN_CONFIG.username &&
@@ -245,25 +339,26 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         onSessionChange(newSession);
         setLoginStep('authenticated');
 
-        if (isRoot) {
-          tacticalAudio.playSuccess();
-          appendLine('[CREDENTIAL RECOGNIZED // OVERRIDE GRANTED]', 'root');
-          appendLine(`[CLEARANCE: LV.5 ROOT // ROOT ACCESS TO SYSTEM KERNEL]`, 'root');
-          appendLine(`WELCOME ROOT OPERATOR @${newSession.username}. UNRESTRICTED PRIVILEGES ENGAGED.`, 'root');
-        } else {
-          tacticalAudio.playSuccess();
-          appendLine('[CREDENTIAL VERIFIED // GUEST PROFILE GENERATED]', 'success');
-          appendLine(`[CLEARANCE: LV.3 STANDARD] OPERATOR @${newSession.username} AUTHENTICATED.`, 'success');
-        }
+        const authOutput: Array<{ text: string; type: TerminalLine['type']; delay?: number }> = isRoot
+          ? [
+              { text: '[CREDENTIAL RECOGNIZED // OVERRIDE GRANTED]', type: 'root', delay: 35 },
+              { text: '[CLEARANCE: LV.5 ROOT // ROOT ACCESS TO SYSTEM KERNEL]', type: 'root', delay: 35 },
+              { text: `WELCOME ROOT OPERATOR @${newSession.username}. UNRESTRICTED PRIVILEGES ENGAGED.`, type: 'root', delay: 35 },
+              { text: "TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", type: 'warn', delay: 30 },
+            ]
+          : [
+              { text: '[CREDENTIAL VERIFIED // GUEST PROFILE GENERATED]', type: 'success', delay: 35 },
+              { text: `[CLEARANCE: LV.3 STANDARD] OPERATOR @${newSession.username} AUTHENTICATED.`, type: 'success', delay: 35 },
+              { text: "TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", type: 'warn', delay: 30 },
+            ];
 
-        appendLine("TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", 'warn');
+        streamLines(authOutput);
         return;
       }
 
       // 3. Authenticated Commands Phase
       if (val.length > 0) {
-        // Freeze command into stream
-        appendLine(`@${session?.username || 'op'} // TALOS > ${val}`, 'input');
+        appendImmediateLine(`@${session?.username || 'op'} // TALOS > ${val}`, 'input');
         setHistory((prev) => [...prev, val]);
         setHistoryIndex(-1);
 
@@ -271,8 +366,12 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
         if (val === 'clear') {
           setLines([]);
-        } else {
-          result.lines.forEach((l) => appendLine(l.text, l.type));
+        } else if (result.lines.length > 0) {
+          // Continuous streaming for command outputs!
+          streamLines(result.lines, result.nextView);
+        } else if (result.nextView) {
+          onNavigate(result.nextView);
+          if (isDrawer && onCloseDrawer) onCloseDrawer();
         }
 
         if (result.clearSession) {
@@ -284,16 +383,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
           setTempUsername('');
         }
 
-        if (result.nextView) {
-          onNavigate(result.nextView);
-          if (isDrawer && onCloseDrawer) {
-            onCloseDrawer();
-          }
-        } else {
-          tacticalAudio.playPromptBeep();
-        }
-
         setInputValue('');
+        setCursorPos(0);
       }
     }
   };
@@ -327,6 +418,27 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     return `@${session?.username || 'op'} // TALOS > `;
   };
 
+  // Render inline caret position
+  const renderInlineCaretText = () => {
+    const isMasked = loginStep === 'password';
+    const displayVal = isMasked ? '•'.repeat(inputValue.length) : inputValue;
+
+    const before = displayVal.slice(0, cursorPos);
+    const charAtCursor = displayVal[cursorPos] || ' ';
+    const after = displayVal.slice(cursorPos + 1);
+
+    return (
+      <span className="font-mono text-xs md:text-sm text-endfield-cyan font-semibold">
+        <span>{before}</span>
+        {/* Real In-line Caret with inverted block text */}
+        <span className="inline-block bg-endfield-yellow text-endfield-bg font-bold px-[1px] leading-tight animate-pulse min-w-[7px] text-center select-none align-baseline">
+          {charAtCursor === ' ' ? '\u00A0' : charAtCursor}
+        </span>
+        <span>{after}</span>
+      </span>
+    );
+  };
+
   return (
     <div
       ref={containerRef}
@@ -337,16 +449,16 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
           : 'w-full h-full bg-endfield-bg text-gray-200'
       }`}
     >
-      {/* Top Banner & Skip hint */}
+      {/* Top Banner & Status bar */}
       <div className="flex items-center justify-between border-b border-endfield-border/60 pb-2 mb-4 select-none">
         <div className="flex items-center space-x-2">
           <span className="w-2.5 h-2.5 bg-endfield-yellow rounded-none inline-block animate-pulse"></span>
           <span className="text-endfield-yellow font-bold tracking-wider text-xs uppercase">
             {session?.isRoot ? 'ROOT KERNEL TTY // CLEARANCE: LV.5' : 'TALOS-II TTY CONSOLE v2.4'}
           </span>
-          {isBooting && (
+          {isStreaming && (
             <span className="text-endfield-cyan text-xs animate-pulse">
-              [BOOT SEQUENCE STREAMING... CLICK ANYWHERE TO SKIP]
+              [STREAMING TELEPRINTER... CLICK/KEY TO SKIP]
             </span>
           )}
         </div>
@@ -374,16 +486,16 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         </div>
       </div>
 
-      {/* 1. Historical Output Lines Stream */}
-      <div className="space-y-1">
+      {/* 1. Historical Output Lines Stream (100% Selectable for Copying) */}
+      <div className="space-y-1 select-text">
         {lines.map((l) => (
-          <div key={l.id} className={`flex items-start ${getLineColorClass(l.type)}`}>
+          <div key={l.id} className={`flex items-start select-text ${getLineColorClass(l.type)}`}>
             {l.timestamp && (
               <span className="text-endfield-muted text-xs mr-2 shrink-0 select-none">
                 [{l.timestamp}]
               </span>
             )}
-            <span className="break-all whitespace-pre-wrap">{l.text}</span>
+            <span className="break-all whitespace-pre-wrap select-text">{l.text}</span>
           </div>
         ))}
       </div>
@@ -395,26 +507,21 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         </div>
       )}
 
-      {/* 2. REAL IN-LINE ACTIVE TTY INPUT LINE (Directly following the text stream) */}
-      {!isBooting && (
-        <div className="flex items-center flex-wrap pt-1 font-mono text-xs md:text-sm">
+      {/* 2. REAL IN-LINE ACTIVE TTY INPUT LINE WITH ADVANCED CARET */}
+      {!isStreaming && (
+        <div className="flex items-center flex-wrap pt-1 font-mono text-xs md:text-sm select-text">
           <span className="text-endfield-yellow font-bold shrink-0 select-none mr-2">
             {getPromptText()}
           </span>
 
-          <span className="text-endfield-cyan font-mono font-semibold tracking-wide">
-            {loginStep === 'password' ? '•'.repeat(inputValue.length) : inputValue}
-          </span>
-
-          {/* Authentic Blinking Block Caret █ */}
-          <span className="w-2.5 h-4 bg-endfield-yellow inline-block align-middle ml-0.5 animate-pulse select-none"></span>
+          {renderInlineCaretText()}
 
           {/* Off-screen/hidden capture input element */}
           <input
             ref={inputRef}
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             autoFocus
             spellCheck={false}
