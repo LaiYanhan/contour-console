@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { TacticalApp } from '../components/layout/TacticalApp';
+import '../styles/global.css';
+---
+
+<Layout title="TALOS-II // Endfield Tactical Holotable & Breach Terminal">
+  <TacticalApp client:only="react" />
+</Layout>
