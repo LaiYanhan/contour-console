@@ -502,10 +502,6 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden select-text">
-      {/* Fixed CRT Scanline & Optical Lens Vignette Overlay (Decoupled from scroll to prevent seams) */}
-      <div className="fixed inset-0 crt-scanlines pointer-events-none z-30" />
-      <div className="fixed inset-0 crt-vignette pointer-events-none z-30" />
-
       <div
         ref={containerRef}
         onClick={handleTerminalClick}

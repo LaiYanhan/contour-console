@@ -79,7 +79,11 @@ export const TacticalApp: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen bg-endfield-bg text-gray-200 overflow-hidden flex flex-col relative select-none">
+    <div className="w-screen h-screen bg-endfield-bg text-gray-200 overflow-hidden flex flex-col relative select-none cad-grid">
+      {/* Universal Physical CRT Monitor Screenplate (Unifies Terminal, Holotable & Surfaces) */}
+      <div className="fixed inset-0 crt-scanlines pointer-events-none z-30" />
+      <div className="fixed inset-0 crt-vignette pointer-events-none z-30" />
+
       {/* 1. Header HUD (Shown when in Holotable or Tactical Surface) */}
       {currentView !== 'terminal' && (
         <HeaderHUD

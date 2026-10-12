@@ -182,12 +182,12 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
           <MatrixRain opacity={1} />
           {/* Centered Overload Stamp */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-[#0A0C0F]/90 border-2 border-endfield-emerald px-8 py-3.5 font-mono text-center shadow-glow-yellow animate-pulse">
-              <span className="text-sm text-endfield-emerald font-black tracking-widest uppercase">
-                // SYSTEM OVERRIDE: NEURAL CASCADE ACTIVE //
+            <div className="bg-[#0A0C0F]/95 border-2 border-endfield-yellow px-8 py-3.5 font-mono text-center shadow-glow-yellow animate-pulse">
+              <span className="text-sm text-endfield-yellow font-black tracking-widest uppercase">
+                // AIC OVERLOAD: SECTOR 04 TOPOLOGY TELEMETRY //
               </span>
-              <p className="text-xs text-gray-200 mt-1 font-mono tracking-wider">
-                DECRYPTING SECTOR 04 TOPOGRAPHY MATRICES
+              <p className="text-xs text-endfield-cyan mt-1 font-mono tracking-wider font-bold">
+                SUBTERRANEAN SENSOR ARRAY RE-SAMPLING STREAM
               </p>
             </div>
           </div>
