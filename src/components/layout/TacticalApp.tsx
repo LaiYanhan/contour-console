@@ -13,6 +13,7 @@ export const TacticalApp: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isWarping, setIsWarping] = useState(false);
+  const [warpDirection, setWarpDirection] = useState<'forward' | 'backward'>('forward');
   const [pendingView, setPendingView] = useState<TacticalView | null>(null);
 
   // Restore session from sessionStorage on client load
@@ -54,11 +55,14 @@ export const TacticalApp: React.FC = () => {
   }
 
   const handleNavigate = (view: TacticalView) => {
-    // Trigger cinematic CRT Aperture Warp when jumping between terminal and holotable/surfaces!
-    if (
-      (currentView === 'terminal' && view !== 'terminal') ||
-      (view === 'terminal' && currentView !== 'terminal')
-    ) {
+    // Terminal -> Holotable/other views: Forward (5x Matrix Rain + Laser Burst)
+    if (currentView === 'terminal' && view !== 'terminal') {
+      setWarpDirection('forward');
+      setPendingView(view);
+      setIsWarping(true);
+    } else if (view === 'terminal' && currentView !== 'terminal') {
+      // Holotable -> Terminal: Backward (Lightweight ASCII Deconstruct)
+      setWarpDirection('backward');
       setPendingView(view);
       setIsWarping(true);
     } else {
@@ -132,6 +136,7 @@ export const TacticalApp: React.FC = () => {
       {/* 4. Cinematic CRT Aperture Warp Transition Engine */}
       <ApertureWarp
         isActive={isWarping}
+        direction={warpDirection}
         onTransitionComplete={handleWarpComplete}
       />
     </div>

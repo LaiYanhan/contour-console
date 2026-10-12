@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { MatrixRain } from './MatrixRain';
 import { tacticalAudio } from '../audio/TacticalAudio';
 
+export type TransitionDirection = 'forward' | 'backward';
+
 interface ApertureWarpProps {
   isActive: boolean;
+  direction?: TransitionDirection;
   onTransitionComplete: () => void;
 }
 
@@ -18,10 +21,13 @@ const AVALANCHE_LOGS = [
 
 export const ApertureWarp: React.FC<ApertureWarpProps> = ({
   isActive,
+  direction = 'forward',
   onTransitionComplete,
 }) => {
-  // Stages: 'idle' | 'logs' | 'matrix' | 'collapse' | 'burst' | 'fadeout'
-  const [phase, setPhase] = useState<'idle' | 'logs' | 'matrix' | 'collapse' | 'burst' | 'fadeout'>('idle');
+  // Stages: 'idle' | 'logs' | 'matrix' | 'collapse' | 'burst' | 'fadeout' | 'backward_deconstruct'
+  const [phase, setPhase] = useState<
+    'idle' | 'logs' | 'matrix' | 'collapse' | 'burst' | 'fadeout' | 'backward_deconstruct'
+  >('idle');
   const [logIndex, setLogIndex] = useState(0);
 
   const handleSkip = () => {
@@ -36,6 +42,27 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
       return;
     }
 
+    // ==========================================================
+    // BACKWARD DIRECTION: Holotable -> Terminal (Lightweight ASCII Deconstruction)
+    // ==========================================================
+    if (direction === 'backward') {
+      setPhase('backward_deconstruct');
+      tacticalAudio.playKeyClick();
+
+      // Deconstruct for ~0.35s and cleanly return to terminal
+      const tBack = setTimeout(() => {
+        onTransitionComplete();
+        setPhase('idle');
+      }, 360);
+
+      return () => {
+        clearTimeout(tBack);
+      };
+    }
+
+    // ==========================================================
+    // FORWARD DIRECTION: Terminal -> Holotable (Full 5x Matrix Rain + Laser Burst)
+    // ==========================================================
     // Stage 1: Log Avalanche (0ms - 450ms)
     setPhase('logs');
     tacticalAudio.playKeyClick();
@@ -45,35 +72,35 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
       tacticalAudio.playKeyClick();
     }, 70);
 
-    // Stage 2: Matrix Rain Cascade (450ms - 1150ms)
+    // Stage 2: 5x Extended Matrix Code Rain Cascade (450ms - 3800ms, ~3.35s of pure rain!)
     const tMatrix = setTimeout(() => {
       clearInterval(logInterval);
       setPhase('matrix');
       tacticalAudio.playTransition();
     }, 450);
 
-    // Stage 3: CRT Laser Collapse (1150ms - 1500ms)
+    // Stage 3: CRT Laser Collapse (3800ms - 4150ms) - Direct collapse without showing terminal
     const tCollapse = setTimeout(() => {
       setPhase('collapse');
       tacticalAudio.playTransition();
-    }, 1150);
+    }, 3800);
 
-    // Stage 3.5: Singularity & CAD Burst (1500ms - 1800ms)
+    // Stage 3.5: Singularity Detonation & CAD Burst (4150ms - 4450ms)
     const tBurst = setTimeout(() => {
       setPhase('burst');
       tacticalAudio.playSuccess();
-    }, 1500);
+    }, 4150);
 
-    // Stage 4: Mount Holotable under fading burst (1750ms)
+    // Stage 4: Mount Holotable under fading burst (4400ms)
     const tMount = setTimeout(() => {
       onTransitionComplete();
       setPhase('fadeout');
-    }, 1750);
+    }, 4400);
 
-    // Finish (2150ms)
+    // Finish transition (4700ms)
     const tEnd = setTimeout(() => {
       setPhase('idle');
-    }, 2150);
+    }, 4700);
 
     return () => {
       clearInterval(logInterval);
@@ -83,9 +110,9 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
       clearTimeout(tMount);
       clearTimeout(tEnd);
     };
-  }, [isActive, onTransitionComplete]);
+  }, [isActive, direction, onTransitionComplete]);
 
-  // Global key to skip transition
+  // Global key to skip forward transition
   useEffect(() => {
     if (phase === 'idle') return;
     const handleKey = (e: KeyboardEvent) => {
@@ -102,16 +129,38 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
   return (
     <div
       onClick={handleSkip}
-      className="fixed inset-0 z-[100] overflow-hidden flex items-center justify-center select-none cursor-pointer"
+      className="fixed inset-0 z-[100] overflow-hidden flex items-center justify-center select-none cursor-pointer bg-[#0A0C0F]"
     >
-      {/* Skip indicator prompt */}
-      <div className="absolute top-4 right-4 z-[120] text-xs font-mono text-endfield-yellow/80 bg-endfield-bg/80 border border-endfield-border px-2 py-1">
-        [CLICK / SPACE TO SKIP WARP]
-      </div>
+      {/* Skip indicator prompt (Only during forward long transition) */}
+      {direction === 'forward' && phase !== 'fadeout' && (
+        <div className="absolute top-4 right-4 z-[125] text-xs font-mono text-endfield-yellow bg-endfield-bg/90 border border-endfield-yellow/60 px-3 py-1 shadow-glow-yellow-sm animate-pulse">
+          [PRESS SPACE / ESC / CLICK TO SKIP WARP]
+        </div>
+      )}
 
-      {/* 1. Stage 1: Log Avalanche Overload */}
+      {/* ======================================================== */}
+      {/* BACKWARD DECONSTRUCTION OVERLAY (Holotable -> Terminal) */}
+      {/* ======================================================== */}
+      {phase === 'backward_deconstruct' && (
+        <div className="absolute inset-0 bg-[#0A0C0F] z-[120] flex flex-col items-center justify-center font-mono p-4">
+          <div className="w-full max-w-lg space-y-1 text-center">
+            <span className="text-sm font-bold text-endfield-yellow text-glow-yellow tracking-widest animate-pulse uppercase">
+              // REVERTING TO TTY PROTOCOL BUFFER //
+            </span>
+            <div className="text-xs text-endfield-slate mt-2 tracking-wider">
+              [DECONSTRUCTING VOLUMETRIC HOLOTABLE SHADER... PASS]
+            </div>
+            {/* Quick scanline glitch bar */}
+            <div className="w-full h-1 bg-endfield-yellow/60 mt-3 animate-ping" />
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* FORWARD STAGE 1: Log Avalanche Overload */}
+      {/* ======================================================== */}
       {phase === 'logs' && (
-        <div className="absolute inset-0 bg-endfield-bg/95 flex flex-col items-center justify-center font-mono p-4 z-[105]">
+        <div className="absolute inset-0 bg-[#0A0C0F] flex flex-col items-center justify-center font-mono p-4 z-[105]">
           <div className="w-full max-w-xl space-y-1">
             <div className="text-endfield-crimson font-bold text-sm tracking-widest animate-pulse border-b border-endfield-crimson pb-1 mb-2">
               [WARNING: TELEMETRY OVERLOAD DETECTED]
@@ -125,29 +174,35 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
         </div>
       )}
 
-      {/* 2. Stage 2: Matrix Code Rain Cascade */}
+      {/* ======================================================== */}
+      {/* FORWARD STAGE 2: 5x Extended Matrix Code Rain Cascade */}
+      {/* ======================================================== */}
       {phase === 'matrix' && (
-        <div className="absolute inset-0 z-[110] bg-endfield-bg/90">
+        <div className="absolute inset-0 z-[110] bg-[#0A0C0F]">
           <MatrixRain opacity={1} />
           {/* Centered Overload Stamp */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-endfield-bg/90 border-2 border-endfield-emerald px-6 py-3 font-mono text-center shadow-glow-yellow animate-pulse">
-              <span className="text-xs text-endfield-emerald font-bold tracking-widest uppercase">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-[#0A0C0F]/90 border-2 border-endfield-emerald px-8 py-3.5 font-mono text-center shadow-glow-yellow animate-pulse">
+              <span className="text-sm text-endfield-emerald font-black tracking-widest uppercase">
                 // SYSTEM OVERRIDE: NEURAL CASCADE ACTIVE //
               </span>
-              <p className="text-[10px] text-gray-200 mt-1">
-                TRANSITION MATRIX SYNCHRONIZING WITH SECTOR 04
+              <p className="text-xs text-gray-200 mt-1 font-mono tracking-wider">
+                DECRYPTING SECTOR 04 TOPOGRAPHY MATRICES
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. Stage 3: Horizontal Laser Beam Collapse */}
+      {/* ======================================================== */}
+      {/* FORWARD STAGE 3: Direct CRT Laser Collapse (Over Code Rain) */}
+      {/* ======================================================== */}
       {phase === 'collapse' && (
-        <div className="w-full h-full bg-endfield-bg flex items-center justify-center z-[115]">
+        <div className="absolute inset-0 z-[115] bg-[#0A0C0F] flex items-center justify-center overflow-hidden">
+          {/* Code Rain stays behind so there is ZERO flash-back to terminal */}
+          <MatrixRain opacity={0.3} />
           <div
-            className="w-full h-1 bg-white shadow-[0_0_40px_#ffe600,0_0_20px_#ffffff] transition-all duration-300"
+            className="w-full h-1 bg-white shadow-[0_0_50px_#ffe600,0_0_25px_#ffffff] transition-all duration-300 relative z-20"
             style={{
               animation: 'laserCollapse 0.35s cubic-bezier(0.1, 0.9, 0.2, 1) forwards',
             }}
@@ -155,34 +210,36 @@ export const ApertureWarp: React.FC<ApertureWarpProps> = ({
         </div>
       )}
 
-      {/* 4. Stage 3.5 & 4: Radial CAD Shockwave Explosion & Crosshairs */}
+      {/* ======================================================== */}
+      {/* FORWARD STAGE 3.5 & 4: Radial CAD Shockwave Explosion */}
+      {/* ======================================================== */}
       {(phase === 'burst' || phase === 'fadeout') && (
         <div
-          className={`absolute inset-0 z-[115] flex items-center justify-center transition-opacity duration-300 ${
+          className={`absolute inset-0 z-[115] flex items-center justify-center transition-opacity duration-300 bg-[#0A0C0F] ${
             phase === 'fadeout' ? 'opacity-0' : 'opacity-100'
           }`}
         >
           {/* Central Flash */}
-          <div className="absolute w-56 h-56 rounded-full bg-endfield-yellow/40 blur-3xl animate-ping" />
+          <div className="absolute w-64 h-64 rounded-full bg-endfield-yellow/45 blur-3xl animate-ping" />
 
           {/* Expanding Shockwave Ring */}
           <div
-            className="w-32 h-32 rounded-full border-4 border-endfield-yellow shadow-[0_0_60px_#ffe600] animate-ping"
+            className="w-36 h-36 rounded-full border-4 border-endfield-yellow shadow-[0_0_60px_#ffe600] animate-ping"
             style={{ animationDuration: '0.6s' }}
           />
 
           {/* High-speed CAD Crosshairs and Tactical Coordinates */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-full h-[1px] bg-endfield-yellow shadow-[0_0_15px_#ffe600]" />
-            <div className="h-full w-[1px] absolute bg-endfield-yellow shadow-[0_0_15px_#ffe600]" />
+            <div className="w-full h-[1px] bg-endfield-yellow shadow-[0_0_18px_#ffe600]" />
+            <div className="h-full w-[1px] absolute bg-endfield-yellow shadow-[0_0_18px_#ffe600]" />
           </div>
 
           {/* Center Status Stamp */}
-          <div className="absolute z-10 flex flex-col items-center justify-center bg-endfield-bg/95 border border-endfield-yellow px-8 py-3 shadow-glow-yellow">
-            <span className="text-sm font-mono font-bold tracking-[0.3em] text-endfield-yellow uppercase animate-pulse">
+          <div className="absolute z-10 flex flex-col items-center justify-center bg-endfield-bg/95 border-2 border-endfield-yellow px-8 py-3.5 shadow-glow-yellow">
+            <span className="text-sm font-mono font-black tracking-[0.3em] text-endfield-yellow uppercase animate-pulse">
               // WARP OVERRIDE: SECTOR 04 //
             </span>
-            <span className="text-xs font-mono text-gray-200 mt-1">
+            <span className="text-xs font-mono text-gray-100 mt-1 font-bold">
               HOLOTABLE TELEMETRY ONLINE
             </span>
           </div>

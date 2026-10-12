@@ -7,6 +7,7 @@ import {
   ADMIN_CONFIG,
 } from './CommandParser';
 import { tacticalAudio } from '../audio/TacticalAudio';
+import { DEEP_POST_BOOT_SEQUENCE } from './BootSequenceData';
 
 interface BootTerminalProps {
   session: OperatorSession | null;
@@ -16,26 +17,6 @@ interface BootTerminalProps {
   onCloseDrawer?: () => void;
 }
 
-const BOOT_SEQUENCE: Array<{ text: string; type: TerminalLine['type']; delay?: number }> = [
-  { text: '[ 0.000000] TALOS-II SUBTERRA KERNEL 4.19-RT COLD BOOT SEQUENCE...', type: 'system', delay: 40 },
-  { text: '[ 0.038102] CPU ARCH: ARM64 // BUS SPEED: 12.8 Gbps // REGISTERS: OK', type: 'info', delay: 30 },
-  { text: '[ 0.071920] WEBGPU TOPOGRAPHIC SHADER CONTEXT: INITIALIZED [60 FPS]', type: 'info', delay: 30 },
-  { text: '[ 0.114290] SCANLINE RESOLUTION: 1080P // AUDIO SYNTHESIZER: ARMED', type: 'info', delay: 30 },
-  { text: '[ 0.158200] DECRYPTING SECTOR 04 TOPOLOGY & LIDAR CONTOUR MESH...', type: 'warn', delay: 35 },
-  { text: '[ 0.189000] [SYSTEM OVERRIDE DETECTED // RENDERING VECTOR EMBLEM]', type: 'warn', delay: 50 },
-  // ASCII Emblem
-  { text: '  ███████╗███╗   ██╗██████╗ ███████╗██╗███████╗██╗     ██████╗ ', type: 'ascii', delay: 25 },
-  { text: '  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║██╔════╝██║     ██╔══██╗', type: 'ascii', delay: 25 },
-  { text: '  █████╗  ██╔██╗ ██║██║  ██║█████╗  ██║█████╗  ██║     ██║  ██║', type: 'ascii', delay: 25 },
-  { text: '  ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██║██╔══╝  ██║     ██║  ██║', type: 'ascii', delay: 25 },
-  { text: '  ███████╗██║ ╚████║██████╔╝██║     ██║███████╗███████╗██████╔╝', type: 'ascii', delay: 25 },
-  { text: '  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝ ', type: 'ascii', delay: 25 },
-  { text: '    // TALOS-II PROTOCOL GATEWAY // TACTICAL ARCHITECTURE //   ', type: 'ascii', delay: 45 },
-  // Gateway Ready Prompt
-  { text: '================================================================', type: 'system', delay: 30 },
-  { text: '[ACCESS GATEWAY]: Unauthenticated terminal session detected.', type: 'warn', delay: 35 },
-  { text: 'Provisioning guest profile. Enter Operator ID (or admin for root):', type: 'info', delay: 35 },
-];
 
 export const BootTerminal: React.FC<BootTerminalProps> = ({
   session,
@@ -167,8 +148,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
       return;
     }
 
-    // Cold boot: stream initial boot sequence
-    streamLines(BOOT_SEQUENCE);
+    // Cold boot: stream deep 160-line hardware POST diagnostic sequence!
+    streamLines(DEEP_POST_BOOT_SEQUENCE);
 
     return () => {
       clearTimeout(streamTimerRef.current);
@@ -430,8 +411,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     return (
       <span className="font-mono text-xs md:text-sm text-endfield-cyan font-semibold">
         <span>{before}</span>
-        {/* Real In-line Caret with inverted block text */}
-        <span className="inline-block bg-endfield-yellow text-endfield-bg font-bold px-[1px] leading-tight animate-pulse min-w-[7px] text-center select-none align-baseline">
+        {/* Real In-line Caret with square-wave 400ms high-frequency instant blink */}
+        <span className="inline-block bg-endfield-yellow text-endfield-bg font-black px-[1.5px] leading-tight cursor-square-wave min-w-[8px] text-center select-none align-baseline shadow-[0_0_8px_#ffe600]">
           {charAtCursor === ' ' ? '\u00A0' : charAtCursor}
         </span>
         <span>{after}</span>
@@ -440,19 +421,20 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   };
 
   return (
-    <div
-      ref={containerRef}
-      onClick={handleTerminalClick}
-      className={`relative font-mono text-xs md:text-sm leading-relaxed overflow-y-auto cursor-text select-text p-4 md:p-8 scrollbar-thin scrollbar-thumb-endfield-border cad-grid ${
-        isDrawer
-          ? 'h-full bg-endfield-bg/95 backdrop-blur-xl border-b-2 border-endfield-yellow shadow-tactical'
-          : 'w-full h-full bg-endfield-bg text-gray-200'
-      }`}
-    >
-      {/* CRT Scanline & Optical Lens Vignette Overlay */}
-      <div className="absolute inset-0 crt-scanlines pointer-events-none z-10" />
-      <div className="absolute inset-0 crt-vignette pointer-events-none z-10" />
+    <div className="relative w-full h-full overflow-hidden select-text">
+      {/* Fixed CRT Scanline & Optical Lens Vignette Overlay (Decoupled from scroll to prevent seams) */}
+      <div className="fixed inset-0 crt-scanlines pointer-events-none z-30" />
+      <div className="fixed inset-0 crt-vignette pointer-events-none z-30" />
 
+      <div
+        ref={containerRef}
+        onClick={handleTerminalClick}
+        className={`relative font-mono text-xs md:text-sm leading-relaxed overflow-y-auto cursor-text select-text p-4 md:p-8 scrollbar-thin scrollbar-thumb-endfield-border cad-grid w-full h-full ${
+          isDrawer
+            ? 'bg-endfield-bg/95 backdrop-blur-xl border-b-2 border-endfield-yellow shadow-tactical'
+            : 'bg-endfield-bg text-gray-200'
+        }`}
+      >
       {/* Heavy-duty Industrial TTY Header Bar */}
       <div className="relative z-20 flex items-center justify-between border-b border-endfield-border pb-2.5 mb-4 select-none bg-endfield-surface/70 px-3 py-1.5 shadow-tactical-card border-l-2 border-l-endfield-yellow">
         <div className="flex items-center space-x-3">
@@ -541,5 +523,6 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         </div>
       )}
     </div>
+      </div>
   );
 };
