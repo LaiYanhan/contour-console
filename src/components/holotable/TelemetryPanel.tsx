@@ -14,7 +14,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   return (
     <div className="w-full flex flex-col md:flex-row items-center justify-between px-4 md:px-8 py-3 select-none pointer-events-auto z-20 shrink-0 gap-3">
       {/* 1. Left Telemetry Module (Image #1 1:1 match) */}
-      <div className="relative flex flex-col bg-[#11141B]/95 border border-endfield-border p-3 min-w-[270px] md:min-w-[340px] backdrop-blur-xl shadow-tactical-card">
+      <div className="relative flex flex-col bg-[#11141B]/95 border border-endfield-border p-3 min-w-[270px] md:min-w-[340px] backdrop-blur-xl shadow-tactical-card crt-panel">
         {/* Reticle Corner Brackets */}
         <span className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-endfield-yellow/80 pointer-events-none"></span>
         <span className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-endfield-yellow/80 pointer-events-none"></span>
@@ -27,8 +27,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             <span className="text-gray-100 font-bold">北部管线深坑</span>
           </div>
           <div className="flex items-center space-x-3 text-[11px]">
-            <span className="text-endfield-yellow font-bold">⚡ 14.4K/15K</span>
-            <span className="text-endfield-cyan font-bold">⚙ 4200 O/MIN</span>
+            <span className="text-endfield-yellow text-glow-yellow font-bold">⚡ 14.4K/15K</span>
+            <span className="text-endfield-cyan text-glow-cyan font-bold">⚙ 4200 O/MIN</span>
           </div>
         </div>
 
@@ -39,14 +39,14 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             <span className="text-gray-200">大盘碱地</span>
           </div>
           <div className="flex items-center space-x-3 text-[11px]">
-            <span className="text-endfield-yellow font-bold">⚡ 14.4K/15K</span>
-            <span className="text-endfield-cyan font-bold">⚙ 4200 O/MIN</span>
+            <span className="text-endfield-yellow text-glow-yellow font-bold">⚡ 14.4K/15K</span>
+            <span className="text-endfield-cyan text-glow-cyan font-bold">⚙ 4200 O/MIN</span>
           </div>
         </div>
 
         <div className="text-[9px] font-mono text-endfield-slate flex justify-between pt-1 border-t border-endfield-border/40">
           <span>AIC_NETWORK: TALOS_NODE_04</span>
-          <span className="text-endfield-emerald font-bold">● GRID_STABLE [100%]</span>
+          <span className="text-endfield-emerald text-glow-emerald font-bold">● GRID_STABLE [100%]</span>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           tacticalAudio.playTransition();
           onNavigate('breach');
         }}
-        className="relative cursor-pointer group flex items-center bg-[#11141B]/95 border border-endfield-yellow/50 hover:border-endfield-yellow p-3 min-w-[250px] md:min-w-[290px] backdrop-blur-xl transition-all shadow-tactical-card"
+        className="relative cursor-pointer group flex items-center bg-[#11141B]/95 border border-endfield-yellow/50 hover:border-endfield-yellow p-3 min-w-[250px] md:min-w-[290px] backdrop-blur-xl transition-all shadow-tactical-card crt-panel"
       >
         {/* Reticle Corner Brackets */}
         <span className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-endfield-yellow/80 pointer-events-none"></span>
@@ -109,7 +109,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             <span className="text-[10px] font-mono font-bold bg-endfield-crimson text-white px-1">
               ALERT
             </span>
-            <span className="text-[11px] font-mono font-bold text-gray-100 group-hover:text-endfield-yellow transition-colors">
+            <span className="text-[11px] font-mono font-bold text-gray-100 text-glow-yellow group-hover:text-endfield-yellow transition-colors">
               WATCH DOGS BREACH
             </span>
           </div>

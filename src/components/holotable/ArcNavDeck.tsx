@@ -127,7 +127,7 @@ export const ArcNavDeck: React.FC<ArcNavDeckProps> = ({
         onClick={() => handleCardClick(item)}
         onMouseEnter={handleCardHover}
         className={`group relative flex items-center space-x-3 px-4 py-3 min-w-[145px] md:min-w-[172px] transition-all duration-200 select-none text-left
-          border backdrop-blur-xl shadow-tactical-card
+          border backdrop-blur-xl shadow-tactical-card crt-panel
           before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/25 before:to-transparent
           ${
             item.requiresRoot
@@ -176,7 +176,7 @@ export const ArcNavDeck: React.FC<ArcNavDeckProps> = ({
         {/* Text information */}
         <div className="flex flex-col">
           <div className="flex items-center space-x-1.5">
-            <span className="font-black text-sm tracking-wide text-gray-100 group-hover:text-endfield-yellow group-hover:text-glow-yellow transition-colors font-sans">
+            <span className="font-black text-sm tracking-wide text-gray-100 text-glow-yellow group-hover:text-endfield-yellow transition-colors font-sans">
               {item.labelZh}
             </span>
             <span className="text-[10px] font-mono text-endfield-muted font-bold">

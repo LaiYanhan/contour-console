@@ -360,26 +360,26 @@ export const HolotableCanvas: React.FC<HolotableCanvasProps> = ({ onSelectBeacon
         {/* Outer Circular Dial Bezel */}
         <div className="w-[340px] h-[340px] md:w-[540px] md:h-[540px] rounded-full border border-endfield-border/60 border-dashed pointer-events-none absolute flex items-center justify-center">
           {/* Degree ticks */}
-          <span className="absolute top-1 text-[10px] font-mono text-endfield-yellow/70 tracking-widest">
+          <span className="absolute top-1 text-[10px] font-mono text-endfield-yellow text-glow-yellow tracking-widest">
             000° // NORTH
           </span>
-          <span className="absolute bottom-1 text-[10px] font-mono text-endfield-slate/60 tracking-widest">
+          <span className="absolute bottom-1 text-[10px] font-mono text-endfield-cyan/80 text-glow-cyan tracking-widest">
             180° // SOUTH
           </span>
-          <span className="absolute left-1 text-[10px] font-mono text-endfield-slate/60 tracking-widest">
+          <span className="absolute left-1 text-[10px] font-mono text-endfield-cyan/80 text-glow-cyan tracking-widest">
             270° // WEST
           </span>
-          <span className="absolute right-1 text-[10px] font-mono text-endfield-slate/60 tracking-widest">
+          <span className="absolute right-1 text-[10px] font-mono text-endfield-cyan/80 text-glow-cyan tracking-widest">
             090° // EAST
           </span>
         </div>
 
         {/* Center Target Badge */}
         <div className="pointer-events-none flex flex-col items-center">
-          <div className="text-[11px] font-mono font-bold tracking-[0.25em] text-endfield-yellow bg-endfield-bg/80 px-2 py-0.5 border border-endfield-yellow/40 backdrop-blur-sm shadow-glow-yellow-sm">
+          <div className="text-[11px] font-mono font-bold tracking-[0.25em] text-endfield-yellow text-glow-yellow bg-endfield-bg/90 px-3 py-1 border border-endfield-yellow/60 backdrop-blur-sm shadow-glow-yellow-sm crt-panel">
             ENDFIELD // LIDAR SURVEY
           </div>
-          <div className="text-[9px] font-mono text-endfield-slate/80 mt-1">
+          <div className="text-[9px] font-mono text-endfield-cyan text-glow-cyan mt-1">
             ELEVATION_MAP: VALLEY_04 [ACTIVE]
           </div>
         </div>

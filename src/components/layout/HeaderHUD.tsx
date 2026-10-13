@@ -24,7 +24,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
   };
 
   return (
-    <header className="relative w-full h-14 bg-[#0C0E12]/92 backdrop-blur-xl border-b border-endfield-border px-4 flex items-center justify-between select-none z-30 shrink-0 shadow-tactical before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent">
+    <header className="relative w-full h-14 bg-[#0C0E12]/95 backdrop-blur-xl border-b border-endfield-border px-4 flex items-center justify-between select-none z-30 shrink-0 shadow-tactical crt-panel before:absolute before:inset-x-0 before:top-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent">
       {/* Left: Tactical Brand & Operator Identity */}
       <div className="flex items-center space-x-3">
         {/* Endfield Geometric Monogram */}
@@ -39,7 +39,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
             EF
           </div>
           <div className="hidden sm:flex flex-col">
-            <span className="text-xs font-mono font-bold tracking-widest text-gray-100 group-hover:text-endfield-yellow transition-colors">
+            <span className="text-xs font-mono font-bold tracking-widest text-gray-100 group-hover:text-endfield-yellow text-glow-yellow transition-colors">
               TALOS-II // ENDFIELD
             </span>
             <span className="text-[9px] font-mono text-endfield-slate">
@@ -77,17 +77,17 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
       {/* Center: Image #1 Signature Resource Counters */}
       <div className="hidden md:flex items-center space-x-6 font-mono text-xs">
         {/* Yellow Power Cube Metric */}
-        <div className="flex items-center space-x-2 bg-endfield-surface/70 px-3 py-1 border border-endfield-border/60">
-          <div className="w-2.5 h-2.5 bg-endfield-yellow rotate-45"></div>
+        <div className="flex items-center space-x-2 bg-endfield-surface/90 px-3 py-1 border border-endfield-border/80 crt-panel">
+          <div className="w-2.5 h-2.5 bg-endfield-yellow rotate-45 shadow-[0_0_6px_#ffe600]"></div>
           <span className="text-endfield-slate text-[10px]">ENERGY:</span>
-          <span className="font-bold text-endfield-yellow">2,406</span>
+          <span className="font-bold text-endfield-yellow text-glow-yellow">2,406</span>
         </div>
 
         {/* Tactical Credits / C-Metric */}
-        <div className="flex items-center space-x-2 bg-endfield-surface/70 px-3 py-1 border border-endfield-border/60">
-          <span className="text-endfield-cyan font-bold">©</span>
+        <div className="flex items-center space-x-2 bg-endfield-surface/90 px-3 py-1 border border-endfield-border/80 crt-panel">
+          <span className="text-endfield-cyan text-glow-cyan font-bold">©</span>
           <span className="text-endfield-slate text-[10px]">CREDITS:</span>
-          <span className="font-bold text-gray-100">159,640</span>
+          <span className="font-bold text-gray-100 text-glow-cyan">159,640</span>
         </div>
       </div>
 
@@ -97,10 +97,10 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
         <button
           onClick={handleToggleSound}
           title={isMuted ? 'Unmute tactical audio' : 'Mute tactical audio'}
-          className={`px-2 py-1 text-xs font-mono border transition-all ${
+          className={`px-2 py-1 text-xs font-mono border transition-all crt-panel ${
             isMuted
               ? 'border-endfield-border text-endfield-muted hover:text-gray-200'
-              : 'border-endfield-yellow/50 text-endfield-yellow bg-endfield-yellow/10 hover:bg-endfield-yellow/20'
+              : 'border-endfield-yellow/60 text-endfield-yellow text-glow-yellow bg-endfield-yellow/10 hover:bg-endfield-yellow/20'
           }`}
         >
           {isMuted ? 'SFX: OFF' : 'SFX: ON'}
@@ -112,7 +112,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({
             tacticalAudio.playPromptBeep();
             onToggleTerminalDrawer();
           }}
-          className="px-2.5 py-1 text-xs font-mono font-bold bg-endfield-surface hover:bg-endfield-card text-endfield-cyan border border-endfield-cyan/40 hover:border-endfield-cyan transition-colors"
+          className="px-2.5 py-1 text-xs font-mono font-bold bg-endfield-surface hover:bg-endfield-card text-endfield-cyan text-glow-cyan border border-endfield-cyan/50 hover:border-endfield-cyan transition-colors crt-panel"
           title="Toggle Terminal Drawer (or press ~)"
         >
           CLI [~]

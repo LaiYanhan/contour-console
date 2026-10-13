@@ -60,7 +60,7 @@ export const BreachProtocol: React.FC = () => {
     <div className="flex flex-col items-center justify-center p-4 max-w-2xl mx-auto font-mono select-none">
       {/* Breach Header */}
       <div className="text-center mb-6">
-        <div className="flex items-center justify-center space-x-2 text-endfield-yellow text-xs font-bold tracking-widest uppercase mb-1">
+        <div className="flex items-center justify-center space-x-2 text-endfield-yellow text-glow-yellow text-xs font-bold tracking-widest uppercase mb-1">
           <span className="w-2 h-2 bg-endfield-yellow animate-ping"></span>
           <span>WATCH DOGS INTRUSION PROTOCOL // CTOS BREACH</span>
         </div>
@@ -77,11 +77,11 @@ export const BreachProtocol: React.FC = () => {
             <button
               key={node.id}
               onClick={() => handleRotateNode(node.id)}
-              className={`flex flex-col items-center justify-center p-4 border transition-all duration-300 relative group
+              className={`flex flex-col items-center justify-center p-4 border transition-all duration-300 relative group crt-panel
                 ${
                   isAligned
                     ? 'border-endfield-emerald bg-endfield-emerald/10 shadow-glow-yellow-sm'
-                    : 'border-endfield-border bg-endfield-card/80 hover:border-endfield-yellow'
+                    : 'border-endfield-border bg-endfield-card/85 hover:border-endfield-yellow'
                 }
               `}
               style={{
@@ -129,8 +129,8 @@ export const BreachProtocol: React.FC = () => {
 
       {/* Result Status Banner */}
       {isBreached ? (
-        <div className="w-full bg-endfield-emerald/20 border border-endfield-emerald p-4 text-center mb-6 shadow-glow-yellow animate-fade-in">
-          <div className="text-base font-bold text-endfield-emerald tracking-widest uppercase">
+        <div className="w-full bg-endfield-emerald/20 border border-endfield-emerald p-4 text-center mb-6 shadow-glow-yellow animate-fade-in crt-panel">
+          <div className="text-base font-bold text-endfield-emerald text-glow-emerald tracking-widest uppercase">
             [ACCESS GRANTED // BREACH PROTOCOL OVERRIDE COMPLETE]
           </div>
           <div className="text-xs text-gray-200 mt-1">

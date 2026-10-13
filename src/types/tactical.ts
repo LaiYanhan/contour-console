@@ -6,6 +6,8 @@ export interface OperatorSession {
   isRoot: boolean;
   token: string;
   loginTimestamp: number;
+  passwordHash?: string;
+  originalUsername?: string;
 }
 
 export type TacticalView = 

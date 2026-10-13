@@ -1,6 +1,7 @@
 import { INITIAL_USER_HOME } from './initialVfs';
 
 export type VfsNodeType = 'file' | 'dir';
+export type PasswordLockType = 'user' | 'cipher';
 
 export interface VfsFile {
   type: 'file';
@@ -10,6 +11,11 @@ export interface VfsFile {
   updatedAt?: string;
   isExecutable?: boolean;
   isSecret?: boolean;
+  owner?: 'root' | 'user';
+  protectedByRoot?: boolean;
+  passwordLock?: PasswordLockType;
+  cipherKey?: string;
+  unlocked?: boolean;
 }
 
 export interface VfsDirectory {
@@ -18,6 +24,11 @@ export interface VfsDirectory {
   children: Record<string, VfsNode>;
   permissions?: string;
   updatedAt?: string;
+  owner?: 'root' | 'user';
+  protectedByRoot?: boolean;
+  passwordLock?: PasswordLockType;
+  cipherKey?: string;
+  unlocked?: boolean;
 }
 
 export type VfsNode = VfsFile | VfsDirectory;
@@ -36,16 +47,23 @@ function cloneNode(node: VfsNode): VfsNode {
   };
 }
 
+export interface VfsAccessCheck {
+  allowed: boolean;
+  requiresPassword?: PasswordLockType;
+  cipherKey?: string;
+  targetAbs: string;
+  error?: string;
+}
+
 export class VirtualFileSystem {
   private root: VfsDirectory;
-  private currentPath: string;
-  private username: string;
+  public currentPath: string;
+  public username: string;
 
   constructor(username: string = 'dedsec00') {
     this.username = username;
     this.currentPath = `/home/${username}`;
 
-    // Initialize root directory tree
     const userHomeChildren: Record<string, VfsNode> = {};
     for (const key of Object.keys(INITIAL_USER_HOME)) {
       userHomeChildren[key] = cloneNode(INITIAL_USER_HOME[key]);
@@ -55,18 +73,23 @@ export class VirtualFileSystem {
       type: 'dir',
       name: '',
       permissions: 'drwxr-xr-x',
+      owner: 'root',
+      protectedByRoot: true,
       updatedAt: '2026-10-12 00:00',
       children: {
         home: {
           type: 'dir',
           name: 'home',
           permissions: 'drwxr-xr-x',
+          owner: 'root',
+          protectedByRoot: true,
           updatedAt: '2026-10-12 00:00',
           children: {
             [username]: {
               type: 'dir',
               name: username,
               permissions: 'drwxr-xr-x',
+              owner: 'user',
               updatedAt: '2026-10-12 10:00',
               children: userHomeChildren,
             },
@@ -76,23 +99,24 @@ export class VirtualFileSystem {
           type: 'dir',
           name: 'system',
           permissions: 'dr-xr-xr-x',
+          owner: 'root',
+          protectedByRoot: true,
           updatedAt: '2026-10-12 00:00',
           children: {
             'kernel.sys': {
               type: 'file',
               name: 'kernel.sys',
-              content: '[TALOS-II KERNEL BINARY // CORE REV 4.19-RT]',
+              content:
+                '[TALOS-II KERNEL BINARY // CORE REV 4.19-RT]\nPROTECTED_RING_0=TRUE\nAIC_SYNC_INTERVAL=16ms\n',
               permissions: '-r--r--r--',
+              owner: 'root',
+              protectedByRoot: true,
               updatedAt: '2026-10-12 00:00',
             },
           },
         },
       },
     };
-  }
-
-  public getCurrentPath(): string {
-    return this.currentPath;
   }
 
   public getDisplayPath(): string {
@@ -108,7 +132,6 @@ export class VirtualFileSystem {
     let raw = target.trim();
     if (!raw || raw === '.') return this.currentPath;
 
-    // Handle home alias ~
     if (raw === '~' || raw.startsWith('~/')) {
       const userHome = `/home/${this.username}`;
       raw = raw === '~' ? userHome : `${userHome}${raw.slice(1)}`;
@@ -144,6 +167,70 @@ export class VirtualFileSystem {
     return current;
   }
 
+  /**
+   * Check read / write / delete permissions & password locks on a target path
+   */
+  public checkAccess(
+    target: string,
+    mode: 'read' | 'write' | 'delete',
+    isRoot: boolean,
+    passwordVerified: boolean = false
+  ): VfsAccessCheck {
+    const targetAbs = this.resolvePath(target);
+    const node = this.getNode(targetAbs);
+
+    // If creating a new file in write mode
+    if (!node) {
+      if (mode === 'write') {
+        const parts = targetAbs.split('/').filter((p) => p.length > 0);
+        parts.pop();
+        const parentPath = `/${parts.join('/')}`;
+        const parentNode = this.getNode(parentPath);
+        if (!parentNode || parentNode.type !== 'dir') {
+          return { allowed: false, targetAbs, error: `No such directory for '${target}'` };
+        }
+        if (parentNode.protectedByRoot && parentPath === '/system' && !isRoot) {
+          return {
+            allowed: false,
+            targetAbs,
+            error: `Permission denied: directory '${parentPath}' requires LV.5 ROOT clearance.`,
+          };
+        }
+        return { allowed: true, targetAbs };
+      }
+      return { allowed: false, targetAbs, error: `'${target}': No such file or directory` };
+    }
+
+    // 1. Check Root Protection on write/delete
+    if ((mode === 'delete' || mode === 'write') && (node.protectedByRoot || node.owner === 'root') && !isRoot) {
+      return {
+        allowed: false,
+        targetAbs,
+        error: `Permission denied: '${node.name}' is owned by root [LV.5 ROOT required]. Run 'su' to elevate.`,
+      };
+    }
+
+    // 2. Check Password Lock on read/write/delete (Root bypasses password locks, or if already verified)
+    if (node.passwordLock && !node.unlocked && !passwordVerified && !isRoot) {
+      return {
+        allowed: false,
+        requiresPassword: node.passwordLock,
+        cipherKey: node.cipherKey,
+        targetAbs,
+      };
+    }
+
+    return { allowed: true, targetAbs };
+  }
+
+  public unlockNode(target: string): void {
+    const targetAbs = this.resolvePath(target);
+    const node = this.getNode(targetAbs);
+    if (node) {
+      node.unlocked = true;
+    }
+  }
+
   public changeDirectory(target: string): { success: boolean; newPath?: string; error?: string } {
     const targetAbs = this.resolvePath(target);
     const node = this.getNode(targetAbs);
@@ -174,10 +261,30 @@ export class VirtualFileSystem {
     return { success: true, nodes: items };
   }
 
-  public readFile(target: string): { success: boolean; content?: string; error?: string } {
-    const targetAbs = this.resolvePath(target);
-    const node = this.getNode(targetAbs);
+  public readFile(
+    target: string,
+    isRoot: boolean = false,
+    passwordVerified: boolean = false
+  ): {
+    success: boolean;
+    content?: string;
+    requiresPassword?: PasswordLockType;
+    cipherKey?: string;
+    error?: string;
+  } {
+    const access = this.checkAccess(target, 'read', isRoot, passwordVerified);
+    if (!access.allowed) {
+      if (access.requiresPassword) {
+        return {
+          success: false,
+          requiresPassword: access.requiresPassword,
+          cipherKey: access.cipherKey,
+        };
+      }
+      return { success: false, error: `cat: ${access.error}` };
+    }
 
+    const node = this.getNode(access.targetAbs);
     if (!node) {
       return { success: false, error: `cat: ${target}: No such file or directory` };
     }
@@ -186,6 +293,61 @@ export class VirtualFileSystem {
     }
 
     return { success: true, content: node.content };
+  }
+
+  public writeFile(
+    target: string,
+    content: string,
+    isRoot: boolean = false
+  ): {
+    success: boolean;
+    isNew?: boolean;
+    lineCount?: number;
+    byteCount?: number;
+    error?: string;
+  } {
+    const access = this.checkAccess(target, 'write', isRoot, true);
+    if (!access.allowed) {
+      return { success: false, error: access.error };
+    }
+
+    const targetAbs = access.targetAbs;
+    const existing = this.getNode(targetAbs);
+    const nowStr = new Date().toTimeString().slice(0, 5);
+    const lineCount = content.split('\n').length;
+    const byteCount = new TextEncoder().encode(content).length;
+
+    if (existing) {
+      if (existing.type === 'dir') {
+        return { success: false, error: `E17: '${target}' is a directory` };
+      }
+      existing.content = content;
+      existing.updatedAt = `2026-10-12 ${nowStr}`;
+      return { success: true, isNew: false, lineCount, byteCount };
+    }
+
+    // Create new file in parent directory
+    const parts = targetAbs.split('/').filter((p) => p.length > 0);
+    const fileName = parts.pop();
+    if (!fileName) {
+      return { success: false, error: 'Invalid file name' };
+    }
+    const parentPath = `/${parts.join('/')}`;
+    const parentNode = this.getNode(parentPath);
+    if (!parentNode || parentNode.type !== 'dir') {
+      return { success: false, error: `Parent directory '${parentPath}' does not exist` };
+    }
+
+    parentNode.children[fileName] = {
+      type: 'file',
+      name: fileName,
+      content,
+      permissions: '-rw-r--r--',
+      owner: isRoot ? 'root' : 'user',
+      updatedAt: `2026-10-12 ${nowStr}`,
+    };
+
+    return { success: true, isNew: true, lineCount, byteCount };
   }
 
   public makeDirectory(target: string): { success: boolean; error?: string } {
@@ -210,6 +372,7 @@ export class VirtualFileSystem {
       type: 'dir',
       name: dirName,
       permissions: 'drwxr-xr-x',
+      owner: 'user',
       updatedAt: '2026-10-12 12:00',
       children: {},
     };
@@ -236,6 +399,7 @@ export class VirtualFileSystem {
         name: fileName,
         content: '',
         permissions: '-rw-r--r--',
+        owner: 'user',
         updatedAt: '2026-10-12 12:00',
       };
     }
@@ -243,10 +407,31 @@ export class VirtualFileSystem {
     return { success: true };
   }
 
-  public removeNode(target: string): { success: boolean; error?: string } {
+  public removeNode(
+    target: string,
+    isRoot: boolean = false,
+    passwordVerified: boolean = false
+  ): {
+    success: boolean;
+    requiresPassword?: PasswordLockType;
+    cipherKey?: string;
+    error?: string;
+  } {
     const targetAbs = this.resolvePath(target);
-    if (targetAbs === '/' || targetAbs === `/home/${this.username}`) {
+    if (targetAbs === '/' || targetAbs === '/home' || targetAbs === `/home/${this.username}`) {
       return { success: false, error: 'rm: cannot remove protected root or home directory' };
+    }
+
+    const access = this.checkAccess(target, 'delete', isRoot, passwordVerified);
+    if (!access.allowed) {
+      if (access.requiresPassword) {
+        return {
+          success: false,
+          requiresPassword: access.requiresPassword,
+          cipherKey: access.cipherKey,
+        };
+      }
+      return { success: false, error: `rm: ${access.error}` };
     }
 
     const parts = targetAbs.split('/').filter((p) => p.length > 0);

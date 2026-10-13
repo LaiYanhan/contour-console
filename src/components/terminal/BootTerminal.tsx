@@ -5,6 +5,7 @@ import {
   handleTabCompletion,
   hashPassword,
   ADMIN_CONFIG,
+  type PasswordChallengeRequest,
 } from './CommandParser';
 import { tacticalAudio } from '../audio/TacticalAudio';
 import { tokenizeText, HARDWARE_POST_LOGS, CLEAN_EMBLEM_SEQUENCE } from './BootSequenceData';
@@ -39,7 +40,8 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [autoCompleteNotice, setAutoCompleteNotice] = useState<string | null>(null);
   const [vfs, setVfs] = useState<VirtualFileSystem>(() => new VirtualFileSystem(session?.username || 'dedsec00'));
-  const [activeVim, setActiveVim] = useState<{ fileName: string; content: string } | null>(null);
+  const [activeVim, setActiveVim] = useState<{ fileName: string; content: string; readOnly: boolean } | null>(null);
+  const [activeChallenge, setActiveChallenge] = useState<PasswordChallengeRequest | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamQueueRef = useRef<Array<{ text: string; type: TerminalLine['type']; delay?: number }>>([]);
@@ -347,23 +349,53 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
         return;
       }
 
-      // 2. Password Phase
+      // 2. Password Phase (Initial Login)
       if (loginStep === 'password') {
+        if (val.toLowerCase() === 'back') {
+          appendImmediateLine('ACCESS_CIPHER [Password] > [ABORTED - SWITCHING USER]', 'warn');
+          setLoginStep('username');
+          setTempUsername('');
+          setInputValue('');
+          setCursorPos(0);
+          return;
+        }
+
         appendImmediateLine(`ENTER ACCESS CIPHER [Password] > ${'•'.repeat(Math.max(val.length, 6))}`, 'input');
         setInputValue('');
         setCursorPos(0);
 
         const hashed = await hashPassword(val);
-        const isRoot =
-          tempUsername.toLowerCase() === ADMIN_CONFIG.username &&
-          hashed === ADMIN_CONFIG.passwordHash;
+        const isAttemptingAdmin =
+          tempUsername.toLowerCase() === ADMIN_CONFIG.username ||
+          tempUsername.toLowerCase() === 'root';
+        const isAdminVerified = ADMIN_CONFIG.passwordHashes.includes(hashed);
 
+        // Strict Admin Check: Never downgrade 'admin' to guest if password is wrong!
+        if (isAttemptingAdmin && !isAdminVerified) {
+          tacticalAudio.playDenied();
+          streamLines([
+            {
+              text: `[ACCESS DENIED]: Invalid Root Cipher for administrator '${tempUsername}' (default: admin123).`,
+              type: 'error',
+              delay: 25,
+            },
+            {
+              text: "Re-enter admin password, or type 'back' to login with a temporary guest ID.",
+              type: 'warn',
+              delay: 25,
+            },
+          ]);
+          return;
+        }
+
+        const isRoot = isAttemptingAdmin && isAdminVerified;
         const newSession: OperatorSession = {
           username: tempUsername,
           clearance: isRoot ? 'LV.5 ROOT' : 'LV.3 STANDARD',
           isRoot,
           token: `SEC-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
           loginTimestamp: Date.now(),
+          passwordHash: hashed,
         };
 
         if (typeof window !== 'undefined') {
@@ -379,16 +411,110 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
               { text: '[CREDENTIAL RECOGNIZED // OVERRIDE GRANTED]', type: 'root', delay: 35 },
               { text: '[CLEARANCE: LV.5 ROOT // ROOT ACCESS TO SYSTEM KERNEL]', type: 'root', delay: 35 },
               { text: `WELCOME ROOT OPERATOR @${newSession.username}. UNRESTRICTED PRIVILEGES ENGAGED.`, type: 'root', delay: 35 },
-              { text: "TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", type: 'warn', delay: 30 },
+              { text: "TYPE 'ls -l', 'help', OR 'system.connect holotable' TO BEGIN.", type: 'warn', delay: 30 },
             ]
           : [
               { text: '[CREDENTIAL VERIFIED // GUEST PROFILE GENERATED]', type: 'success', delay: 35 },
               { text: `[CLEARANCE: LV.3 STANDARD] OPERATOR @${newSession.username} AUTHENTICATED.`, type: 'success', delay: 35 },
-              { text: "TYPE 'system.connect holotable' OR 'help' TO BEGIN TACTICAL OPERATIONS.", type: 'warn', delay: 30 },
+              { text: "TYPE 'ls -l', 'su' (for root), OR 'system.connect holotable' TO BEGIN.", type: 'warn', delay: 30 },
             ];
 
         streamLines(authOutput);
         return;
+      }
+
+      // 2.5 Active Security / Password Challenge Phase (su, user password lock, cipher lock)
+      if (activeChallenge) {
+        appendImmediateLine(
+          `${activeChallenge.prompt}${'•'.repeat(Math.max(val.length, 6))}`,
+          'input'
+        );
+        setInputValue('');
+        setCursorPos(0);
+
+        const challenge = activeChallenge;
+        setActiveChallenge(null);
+
+        const hashed = await hashPassword(val);
+        const isAdminPass = ADMIN_CONFIG.passwordHashes.includes(hashed);
+
+        if (challenge.kind === 'su') {
+          if (isAdminPass) {
+            tacticalAudio.playSuccess();
+            const elevated: OperatorSession = {
+              username: 'root',
+              originalUsername: session?.originalUsername || session?.username || 'dedsec00',
+              clearance: 'LV.5 ROOT',
+              isRoot: true,
+              token: session?.token || 'SEC-ROOT-00',
+              loginTimestamp: session?.loginTimestamp || Date.now(),
+              passwordHash: session?.passwordHash,
+            };
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('endfield_operator_session', JSON.stringify(elevated));
+            }
+            onSessionChange(elevated);
+            streamLines([
+              { text: '[SU OVERRIDE GRANTED] Session elevated to LV.5 ROOT [root@talos].', type: 'root', delay: 25 },
+              { text: 'All root-protected files and kernel commands unlocked.', type: 'success', delay: 25 },
+            ]);
+          } else {
+            tacticalAudio.playDenied();
+            streamLines([
+              { text: 'su: Authentication failure (Invalid root cipher. Default admin pass: admin123)', type: 'error', delay: 25 },
+            ]);
+          }
+          return;
+        }
+
+        if (challenge.kind === 'user') {
+          const isUserPass = session?.passwordHash ? hashed === session.passwordHash : val.length > 0;
+          if (isUserPass || isAdminPass) {
+            tacticalAudio.playSuccess();
+            if (challenge.targetFile) {
+              vfs.unlockNode(challenge.targetFile);
+            }
+            const verifiedRes = parseAndExecuteCommand(challenge.pendingCommand, session, vfs, true);
+            if (verifiedRes.openVim) {
+              setActiveVim(verifiedRes.openVim);
+            } else if (verifiedRes.lines.length > 0) {
+              streamLines([
+                { text: `[IDENTITY VERIFIED] Unlocked '${challenge.targetFile}'.`, type: 'success', delay: 20 },
+                ...verifiedRes.lines,
+              ]);
+            }
+          } else {
+            tacticalAudio.playDenied();
+            streamLines([
+              { text: `[SECURITY CHALLENGE FAILED]: Incorrect login password for @${session?.username || 'op'}.`, type: 'error', delay: 25 },
+            ]);
+          }
+          return;
+        }
+
+        if (challenge.kind === 'cipher') {
+          if (val === challenge.cipherKey || isAdminPass) {
+            tacticalAudio.playSuccess();
+            if (challenge.targetFile) {
+              vfs.unlockNode(challenge.targetFile);
+            }
+            const verifiedRes = parseAndExecuteCommand(challenge.pendingCommand, session, vfs, true);
+            if (verifiedRes.openVim) {
+              setActiveVim(verifiedRes.openVim);
+            } else if (verifiedRes.lines.length > 0) {
+              streamLines([
+                { text: `[DECRYPTION COMPLETE] Passkey verified for '${challenge.targetFile}'.`, type: 'success', delay: 20 },
+                ...verifiedRes.lines,
+              ]);
+            }
+          } else {
+            tacticalAudio.playDenied();
+            streamLines([
+              { text: `[DECRYPTION FAILED]: Invalid passkey for '${challenge.targetFile}'. (Hint: check ~/logs/ctos_audit.log)`, type: 'error', delay: 25 },
+            ]);
+          }
+          return;
+        }
       }
 
       // 3. Authenticated Commands Phase
@@ -399,16 +525,31 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
         const result = parseAndExecuteCommand(val, session, vfs);
 
-        if (result.openVim) {
+        if (result.passwordChallenge) {
+          setActiveChallenge(result.passwordChallenge);
+          tacticalAudio.playPromptBeep();
+        } else if (result.openVim) {
           setActiveVim(result.openVim);
         } else if (val === 'clear') {
           setLines([]);
         } else if (result.lines.length > 0) {
-          // Continuous streaming for command outputs!
           streamLines(result.lines, result.nextView);
         } else if (result.nextView) {
           onNavigate(result.nextView);
           if (isDrawer && onCloseDrawer) onCloseDrawer();
+        }
+
+        if (result.downgradeFromRoot && session) {
+          const downgraded: OperatorSession = {
+            ...session,
+            username: session.originalUsername || 'dedsec00',
+            clearance: 'LV.3 STANDARD',
+            isRoot: false,
+          };
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('endfield_operator_session', JSON.stringify(downgraded));
+          }
+          onSessionChange(downgraded);
         }
 
         if (result.clearSession) {
@@ -450,10 +591,12 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
   };
 
   const getPromptText = () => {
-    if (loginStep === 'username') return 'LOGIN_ID [dedsec00] > ';
+    if (loginStep === 'username') return 'LOGIN_ID [dedsec00 / admin] > ';
     if (loginStep === 'password') return 'ACCESS_CIPHER [Password] > ';
+    if (activeChallenge) return activeChallenge.prompt;
     const dispPath = vfs.getDisplayPath();
-    return `${session?.username || 'op'}@talos:${dispPath}$ `;
+    const symbol = session?.isRoot ? '#' : '$';
+    return `${session?.username || 'op'}@talos:${dispPath}${symbol} `;
   };
 
   const renderLineContent = (l: TerminalLine) => {
@@ -481,7 +624,7 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
 
   // Render inline caret position
   const renderInlineCaretText = () => {
-    const isMasked = loginStep === 'password';
+    const isMasked = loginStep === 'password' || activeChallenge !== null;
     const displayVal = isMasked ? '•'.repeat(inputValue.length) : inputValue;
 
     const before = displayVal.slice(0, cursorPos);
@@ -601,12 +744,18 @@ export const BootTerminal: React.FC<BootTerminalProps> = ({
     </div>
 
     {/* VIM Full-Screen Modal Viewer */}
+    {/* VIM Full-Screen Interactive Modal Editor */}
     {activeVim && (
       <VimModal
         fileName={activeVim.fileName}
-        content={activeVim.content}
-        onClose={() => {
+        initialContent={activeVim.content}
+        readOnly={activeVim.readOnly && !(session?.isRoot ?? false)}
+        onSave={(newContent) => vfs.writeFile(activeVim.fileName, newContent, session?.isRoot ?? false)}
+        onClose={(statusMsg) => {
           setActiveVim(null);
+          if (statusMsg) {
+            appendImmediateLine(`[VIM] ${statusMsg}`, 'success');
+          }
           setTimeout(() => {
             inputRef.current?.focus({ preventScroll: true });
           }, 30);

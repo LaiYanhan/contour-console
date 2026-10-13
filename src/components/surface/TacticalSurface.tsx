@@ -87,7 +87,7 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col p-4 md:p-8 overflow-y-auto bg-endfield-bg select-none cad-grid">
       {/* 1. Tactical Surface Armored Header Bar */}
-      <div className="relative flex items-center justify-between border-b-2 border-endfield-yellow pb-3.5 mb-6 shrink-0 bg-[#11141B]/90 p-4 border border-endfield-border shadow-tactical-card">
+      <div className="relative flex items-center justify-between border-b-2 border-endfield-yellow pb-3.5 mb-6 shrink-0 bg-[#11141B]/95 p-4 border border-endfield-border shadow-tactical-card crt-panel">
         {/* Reticle Corner Brackets */}
         <span className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-endfield-yellow pointer-events-none"></span>
         <span className="absolute bottom-1 right-1 w-2 h-2 border-b-2 border-r-2 border-endfield-yellow pointer-events-none"></span>
@@ -118,7 +118,7 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
             tacticalAudio.playTransition();
             onExit();
           }}
-          className="relative flex items-center space-x-2 px-3.5 py-2 bg-[#161B24] hover:bg-endfield-yellow hover:text-endfield-bg text-endfield-slate border border-endfield-border hover:border-endfield-yellow transition-all duration-200 group text-xs font-mono font-bold shadow-tactical-card"
+          className="relative flex items-center space-x-2 px-3.5 py-2 bg-[#161B24] hover:bg-endfield-yellow hover:text-endfield-bg text-endfield-slate border border-endfield-border hover:border-endfield-yellow transition-all duration-200 group text-xs font-mono font-bold shadow-tactical-card crt-panel"
           style={{
             clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)',
           }}
@@ -139,8 +139,10 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
         {view === 'operator' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono">
             {/* ID Card */}
-            <div className="bg-endfield-surface border border-endfield-border p-5 flex flex-col items-center text-center">
-              <div className="w-24 h-24 bg-endfield-card border-2 border-endfield-yellow mb-4 flex items-center justify-center font-bold text-3xl text-endfield-yellow shadow-glow-yellow-sm">
+            <div className="relative bg-endfield-surface border border-endfield-border p-5 flex flex-col items-center text-center crt-panel">
+              <span className="absolute top-1 left-1 w-2 h-2 border-t border-l border-endfield-yellow/80 pointer-events-none" />
+              <span className="absolute bottom-1 right-1 w-2 h-2 border-b border-r border-endfield-yellow/80 pointer-events-none" />
+              <div className="w-24 h-24 bg-endfield-card border-2 border-endfield-yellow mb-4 flex items-center justify-center font-bold text-3xl text-endfield-yellow text-glow-yellow shadow-glow-yellow-sm crt-panel">
                 {session?.username ? session.username.substring(0, 2).toUpperCase() : 'OP'}
               </div>
               <h3 className="text-lg font-bold text-gray-100">
@@ -168,8 +170,10 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
             </div>
 
             {/* Spec & Skills Matrix */}
-            <div className="md:col-span-2 bg-endfield-surface border border-endfield-border p-5 space-y-4">
-              <h4 className="text-sm font-bold text-endfield-yellow tracking-wider border-b border-endfield-border pb-2">
+            <div className="relative md:col-span-2 bg-endfield-surface border border-endfield-border p-5 space-y-4 crt-panel">
+              <span className="absolute top-1 left-1 w-2 h-2 border-t border-l border-endfield-yellow/80 pointer-events-none" />
+              <span className="absolute bottom-1 right-1 w-2 h-2 border-b border-r border-endfield-yellow/80 pointer-events-none" />
+              <h4 className="text-sm font-bold text-endfield-yellow text-glow-yellow tracking-wider border-b border-endfield-border pb-2">
                 // TECHNICAL ARCHITECTURE & STACKS
               </h4>
               <p className="text-xs text-gray-300 leading-relaxed font-sans">
@@ -178,9 +182,9 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                 {['WebGL / Three.js', 'Astro / React', 'TailwindCSS', 'TypeScript', 'GitHub Pages CI', 'Web Audio API'].map((tag) => (
-                  <div key={tag} className="bg-endfield-card border border-endfield-border/60 p-2.5 text-xs">
+                  <div key={tag} className="bg-endfield-card border border-endfield-border/80 p-2.5 text-xs crt-panel">
                     <div className="text-[10px] text-endfield-muted">CAPABILITY //</div>
-                    <div className="text-gray-200 font-bold mt-0.5">{tag}</div>
+                    <div className="text-gray-100 text-glow-cyan font-bold mt-0.5">{tag}</div>
                   </div>
                 ))}
               </div>
@@ -214,13 +218,15 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
               ].map((p, idx) => (
                 <div
                   key={idx}
-                  className="bg-endfield-surface border border-endfield-border p-4 hover:border-endfield-yellow transition-colors group"
+                  className="relative bg-endfield-surface border border-endfield-border p-4 hover:border-endfield-yellow transition-colors group crt-panel"
                 >
+                  <span className="absolute top-1 left-1 w-1.5 h-1.5 border-t border-l border-endfield-yellow/80 pointer-events-none" />
+                  <span className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b border-r border-endfield-yellow/80 pointer-events-none" />
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="text-sm font-bold text-gray-100 group-hover:text-endfield-yellow transition-colors">
+                    <h4 className="text-sm font-bold text-gray-100 text-glow-yellow group-hover:text-endfield-yellow transition-colors">
                       {p.name}
                     </h4>
-                    <span className="text-[10px] text-endfield-emerald font-bold bg-endfield-emerald/10 px-1.5 py-0.5">
+                    <span className="text-[10px] text-endfield-emerald text-glow-emerald font-bold bg-endfield-emerald/10 px-1.5 py-0.5">
                       {p.status}
                     </span>
                   </div>
@@ -242,8 +248,8 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
 
         {/* VIEW: COMMS */}
         {view === 'comms' && (
-          <div className="bg-endfield-surface border border-endfield-border p-6 font-mono space-y-4 max-w-xl mx-auto">
-            <h3 className="text-sm font-bold text-endfield-yellow tracking-wider border-b border-endfield-border pb-2">
+          <div className="relative bg-endfield-surface border border-endfield-border p-6 font-mono space-y-4 max-w-xl mx-auto crt-panel">
+            <h3 className="text-sm font-bold text-endfield-yellow text-glow-yellow tracking-wider border-b border-endfield-border pb-2">
               // SECURE COMMUNICATION CHANNELS
             </h3>
             <p className="text-xs text-gray-300 font-sans">
@@ -269,8 +275,8 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
 
         {/* VIEW: ARCHIVES */}
         {view === 'archives' && (
-          <div className="bg-endfield-surface border border-endfield-border p-6 font-mono space-y-4">
-            <h3 className="text-sm font-bold text-endfield-yellow tracking-wider border-b border-endfield-border pb-2">
+          <div className="relative bg-endfield-surface border border-endfield-border p-6 font-mono space-y-4 crt-panel">
+            <h3 className="text-sm font-bold text-endfield-yellow text-glow-yellow tracking-wider border-b border-endfield-border pb-2">
               // ARCHIVE INDEX & ARTICLES
             </h3>
             <p className="text-xs text-gray-300 font-sans">
@@ -282,7 +288,7 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
                 { title: 'ADR 0002: 采用纯前端临时操作员凭证生成与双轨权限分级', date: '2026-10-12', tag: 'SECURITY' },
                 { title: 'Endfield Tactical Holotable: 3D 等高线着色器与全息中控设计演进', date: '2026-10-12', tag: 'GRAPHICS' },
               ].map((a, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-endfield-card border border-endfield-border/60 hover:border-endfield-yellow transition-colors">
+                <div key={i} className="flex items-center justify-between p-3 bg-endfield-card border border-endfield-border/80 hover:border-endfield-yellow transition-colors crt-panel">
                   <div className="flex items-center space-x-3">
                     <span className="text-[10px] bg-endfield-yellow/20 text-endfield-yellow px-1 font-bold">{a.tag}</span>
                     <span className="text-xs text-gray-200 font-bold">{a.title}</span>
@@ -296,14 +302,14 @@ export const TacticalSurface: React.FC<TacticalSurfaceProps> = ({
 
         {/* VIEW: BREACH */}
         {view === 'breach' && (
-          <div className="bg-endfield-surface border border-endfield-border p-6">
+          <div className="bg-endfield-surface border border-endfield-border p-6 crt-panel">
             <BreachProtocol />
           </div>
         )}
 
         {/* VIEW: KERNEL (ROOT ONLY) */}
         {view === 'kernel' && (
-          <div className="bg-endfield-surface border-2 border-endfield-crimson p-6 font-mono space-y-4">
+          <div className="bg-endfield-surface border-2 border-endfield-crimson p-6 font-mono space-y-4 crt-panel">
             <div className="flex items-center space-x-2 text-endfield-crimson">
               <span className="w-3 h-3 bg-endfield-crimson"></span>
               <h3 className="text-sm font-bold tracking-widest uppercase">

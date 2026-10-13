@@ -23,20 +23,43 @@ body {
   background-size: 20px 20px;
 }
 
-/* Authentic CRT Horizontal Scanlines Overlay (Hardware Cathode Ray Tube) */
+/* Authentic CRT Horizontal Scanlines + RGB Phosphor Subpixel Aperture Grille */
 .crt-scanlines {
-  background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%,
-    rgba(0, 0, 0, 0.38) 50%
-  );
-  background-size: 100% 3px;
+  background-image:
+    linear-gradient(
+      rgba(18, 16, 16, 0) 50%,
+      rgba(0, 0, 0, 0.48) 50%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 0, 0, 0.03),
+      rgba(0, 255, 0, 0.015),
+      rgba(0, 200, 255, 0.03)
+    );
+  background-size: 100% 3px, 4px 100%;
   pointer-events: none;
 }
 
-/* Convex CRT Lens Optical Vignette (Fixed to physical viewport) */
+/* Convex CRT Lens Optical Vignette (Fixed to physical viewport at z-[999]) */
 .crt-vignette {
-  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.75), inset 0 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    inset 0 0 110px rgba(0, 0, 0, 0.88),
+    inset 0 0 36px rgba(0, 0, 0, 0.72),
+    inset 0 0 4px rgba(255, 230, 0, 0.14);
   pointer-events: none;
+}
+
+/* Component-level CRT Sub-Monitor Panel (Internal scanlines + cathode tube shadow) */
+.crt-panel {
+  background-image: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.42) 50%
+  );
+  background-size: 100% 3px;
+  box-shadow:
+    inset 0 0 26px rgba(0, 0, 0, 0.88),
+    inset 0 1px 0 rgba(255, 230, 0, 0.18),
+    0 8px 24px -4px rgba(0, 0, 0, 0.85);
 }
 
 /* High-frequency Hardware Square-Wave Step Blink Cursor (400ms period) */
@@ -55,15 +78,19 @@ body {
 
 /* Phosphor Text Glow (Hardware phosphor emission luminescence) */
 .text-glow-yellow {
-  text-shadow: 0 0 7px rgba(255, 230, 0, 0.42), 0 0 18px rgba(255, 230, 0, 0.2);
+  text-shadow: 0 0 7px rgba(255, 230, 0, 0.48), 0 0 18px rgba(255, 230, 0, 0.24);
 }
 
 .text-glow-cyan {
-  text-shadow: 0 0 7px rgba(0, 229, 255, 0.42), 0 0 16px rgba(0, 229, 255, 0.2);
+  text-shadow: 0 0 7px rgba(0, 229, 255, 0.48), 0 0 16px rgba(0, 229, 255, 0.24);
 }
 
 .text-glow-emerald {
-  text-shadow: 0 0 7px rgba(0, 255, 157, 0.42), 0 0 16px rgba(0, 255, 157, 0.2);
+  text-shadow: 0 0 7px rgba(0, 255, 157, 0.48), 0 0 16px rgba(0, 255, 157, 0.24);
+}
+
+.text-glow-crimson {
+  text-shadow: 0 0 7px rgba(255, 45, 70, 0.55), 0 0 16px rgba(255, 45, 70, 0.28);
 }
 
 /* Endfield Industrial Hazard Warning Stripes */

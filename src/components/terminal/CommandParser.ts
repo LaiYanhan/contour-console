@@ -1,10 +1,13 @@
-import type { CommandDef, OperatorSession, TacticalView } from '../../types/tactical';
+import type { CommandDef, OperatorSession, TacticalView, TerminalLine } from '../../types/tactical';
 import { VirtualFileSystem } from '../../vfs/vfs';
 
 export const ADMIN_CONFIG = {
   username: 'admin',
-  // SHA-256 for 'endfield.root'
-  passwordHash: 'd8de3df96de5fb709c007b227ba30a96053dea0e6e39016b95a75b36a7f562a3',
+  // SHA-256 hashes for 'admin123' and 'endfield.root'
+  passwordHashes: [
+    '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+    'd8de3df96de5fb709c007b227ba30a96053dea0e6e39016b95a75b36a7f562a3',
+  ],
 };
 
 export const COMMAND_REGISTRY: CommandDef[] = [
@@ -12,7 +15,7 @@ export const COMMAND_REGISTRY: CommandDef[] = [
   {
     command: 'ls',
     usage: 'ls [-l] [path]',
-    description: 'List files and directories in current or specified folder',
+    description: 'List files, owners, permissions, and security locks',
   },
   {
     command: 'cd',
@@ -27,12 +30,12 @@ export const COMMAND_REGISTRY: CommandDef[] = [
   {
     command: 'cat',
     usage: 'cat <filename>',
-    description: 'Concatenate and display text content of specified file',
+    description: 'Read and display text content of specified file',
   },
   {
     command: 'vim',
     usage: 'vim <filename>',
-    description: 'Open in-line terminal text reader/editor for clues and logs',
+    description: 'Open interactive multi-mode Vim editor (i: insert, :wq: save & quit)',
   },
   {
     command: 'mkdir',
@@ -47,7 +50,17 @@ export const COMMAND_REGISTRY: CommandDef[] = [
   {
     command: 'rm',
     usage: 'rm <filename>',
-    description: 'Remove file or directory from virtual filesystem',
+    description: 'Remove file from VFS (subject to root & password locks)',
+  },
+  {
+    command: 'su',
+    usage: 'su [admin]',
+    description: 'Elevate current session to LV.5 ROOT administrator (pass: admin123)',
+  },
+  {
+    command: 'whoami',
+    usage: 'whoami',
+    description: 'Print current effective operator username and clearance level',
   },
 
   // Tactical System Commands
@@ -121,6 +134,14 @@ export async function hashPassword(password: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+export interface PasswordChallengeRequest {
+  kind: 'user' | 'cipher' | 'su';
+  prompt: string;
+  targetFile?: string;
+  cipherKey?: string;
+  pendingCommand: string;
+}
+
 export interface ParseResult {
   lines: Array<{
     text: string;
@@ -128,13 +149,16 @@ export interface ParseResult {
   }>;
   nextView?: TacticalView;
   clearSession?: boolean;
-  openVim?: { fileName: string; content: string };
+  downgradeFromRoot?: boolean;
+  openVim?: { fileName: string; content: string; readOnly: boolean };
+  passwordChallenge?: PasswordChallengeRequest;
 }
 
 export function parseAndExecuteCommand(
   rawInput: string,
   session: OperatorSession | null,
-  vfs?: VirtualFileSystem
+  vfs?: VirtualFileSystem,
+  passwordVerified: boolean = false
 ): ParseResult {
   const trimmed = rawInput.trim();
   if (trimmed.length === 0) {
@@ -169,7 +193,7 @@ export function parseAndExecuteCommand(
     if (!isRoot) {
       output.push({ text: '', type: 'info' });
       output.push({
-        text: '  NOTE: [3] Root-level privileged commands hidden. Log in as admin to unlock.',
+        text: "  NOTE: [3] Root commands hidden. Run 'su' (default pass: admin123) or log in as admin.",
         type: 'warn',
       });
     }
@@ -181,15 +205,67 @@ export function parseAndExecuteCommand(
     return { lines: [] };
   }
 
-  // 2. POSIX VFS: PWD
+  // 2. WHOAMI & SU (Privilege Elevation)
+  if (cmdName === 'whoami') {
+    return {
+      lines: [
+        {
+          text: `${session?.username || 'guest'} [${session?.clearance || 'LV.3 STANDARD'}]`,
+          type: isRoot ? 'root' : 'success',
+        },
+      ],
+    };
+  }
+
+  if (cmdName === 'su' || trimmed === 'sudo su') {
+    if (cmdArg && cmdArg !== 'admin' && cmdArg !== 'root') {
+      if (isRoot && session?.originalUsername && cmdArg === session.originalUsername) {
+        return {
+          lines: [
+            { text: `[SESSION DOWNGRADED] Returning to standard operator @${session.originalUsername}.`, type: 'info' },
+          ],
+          downgradeFromRoot: true,
+        };
+      }
+      return {
+        lines: [{ text: `su: user '${cmdArg}' does not exist. Use 'su' or 'su admin' for root.`, type: 'error' }],
+      };
+    }
+
+    if (isRoot) {
+      return {
+        lines: [{ text: '[ALREADY ROOT] Active session already holds LV.5 ROOT clearance.', type: 'root' }],
+      };
+    }
+
+    return {
+      lines: [],
+      passwordChallenge: {
+        kind: 'su',
+        prompt: 'Password for root [admin]: ',
+        pendingCommand: 'su',
+      },
+    };
+  }
+
+  if (cmdName === 'exit' && isRoot && session?.originalUsername) {
+    return {
+      lines: [
+        { text: `[EXIT ROOT SHELL] Returning to operator @${session.originalUsername} [LV.3 STANDARD].`, type: 'info' },
+      ],
+      downgradeFromRoot: true,
+    };
+  }
+
+  // 3. POSIX VFS: PWD
   if (cmdName === 'pwd') {
-    const cur = vfs ? vfs.getCurrentPath() : '/home/guest';
+    const cur = vfs ? vfs.currentPath : '/home/guest';
     return {
       lines: [{ text: cur, type: 'info' }],
     };
   }
 
-  // 3. POSIX VFS: CD
+  // 4. POSIX VFS: CD
   if (cmdName === 'cd') {
     if (!vfs) return { lines: [{ text: 'cd: vfs not initialized', type: 'error' }] };
     const target = cmdArg || '~';
@@ -200,7 +276,7 @@ export function parseAndExecuteCommand(
     return { lines: [] };
   }
 
-  // 4. POSIX VFS: LS
+  // 5. POSIX VFS: LS
   if (cmdName === 'ls') {
     if (!vfs) return { lines: [{ text: 'ls: vfs not initialized', type: 'error' }] };
     const isLong = parts.includes('-l') || parts.includes('-la') || parts.includes('-al');
@@ -222,26 +298,45 @@ export function parseAndExecuteCommand(
       res.nodes.forEach((node) => {
         const isDir = node.type === 'dir';
         const perms = node.permissions || (isDir ? 'drwxr-xr-x' : '-rw-r--r--');
+        const ownerName = (node.owner === 'root' ? 'root' : session?.username || 'op').padEnd(10);
         const contentLen = node.type === 'file' ? new TextEncoder().encode(node.content).length : 4096;
         const size = `${contentLen}`.padStart(5);
-        const date = node.updatedAt || 'Oct 12 12:00';
+        const date = node.updatedAt || '2026-10-12 12:00';
         const nameSuffix = isDir ? '/' : node.isExecutable ? '*' : '';
-        const lineType: TerminalLine['type'] = isDir ? 'info' : node.isExecutable ? 'success' : node.isSecret ? 'warn' : 'system';
+
+        let lockBadge = '';
+        if (node.passwordLock === 'user' && !node.unlocked) {
+          lockBadge = ' [USER-PASS-LOCKED]';
+        } else if (node.passwordLock === 'cipher' && !node.unlocked) {
+          lockBadge = ' [CIPHER-LOCKED]';
+        } else if (node.protectedByRoot || node.owner === 'root') {
+          lockBadge = ' [ROOT-PROTECTED]';
+        }
+
+        const lineType: TerminalLine['type'] = node.passwordLock && !node.unlocked
+          ? 'warn'
+          : node.owner === 'root'
+          ? 'root'
+          : isDir
+          ? 'info'
+          : node.isExecutable
+          ? 'success'
+          : 'system';
 
         output.push({
-          text: `${perms}  1  ${session?.username || 'op'}  ${session?.username || 'op'}  ${size}  ${date}  ${node.name}${nameSuffix}`,
+          text: `${perms}  1  ${ownerName}  ${size}  ${date}  ${node.name}${nameSuffix}${lockBadge}`,
           type: lineType,
         });
       });
       return { lines: output };
     }
 
-    // Short format with colored labels
     const formatted = res.nodes
       .map((n) => {
         if (n.type === 'dir') return `[DIR] ${n.name}/`;
+        if (n.passwordLock && !n.unlocked) return `[LOCK] ${n.name}`;
+        if (n.owner === 'root' || n.protectedByRoot) return `[ROOT] ${n.name}`;
         if (n.isExecutable) return `[EXE] ${n.name}*`;
-        if (n.isSecret) return `[SEC] ${n.name}`;
         return `      ${n.name}`;
       })
       .join('    ');
@@ -251,38 +346,90 @@ export function parseAndExecuteCommand(
     };
   }
 
-  // 5. POSIX VFS: CAT
+  // 6. POSIX VFS: CAT
   if (cmdName === 'cat') {
     if (!vfs) return { lines: [{ text: 'cat: vfs not initialized', type: 'error' }] };
     if (!cmdArg) return { lines: [{ text: 'cat: missing file operand', type: 'error' }] };
 
-    const res = vfs.readFile(cmdArg);
-    if (!res.success || res.content === undefined) {
+    const res = vfs.readFile(cmdArg, isRoot, passwordVerified);
+    if (!res.success) {
+      if (res.requiresPassword === 'user') {
+        return {
+          lines: [],
+          passwordChallenge: {
+            kind: 'user',
+            prompt: `[SECURITY CHALLENGE] Enter login password for @${session?.username || 'op'} to read '${cmdArg}': `,
+            targetFile: cmdArg,
+            pendingCommand: rawInput,
+          },
+        };
+      }
+      if (res.requiresPassword === 'cipher') {
+        return {
+          lines: [],
+          passwordChallenge: {
+            kind: 'cipher',
+            prompt: `[ENCRYPTED FILE] Enter decryption passkey for '${cmdArg}': `,
+            targetFile: cmdArg,
+            cipherKey: res.cipherKey,
+            pendingCommand: rawInput,
+          },
+        };
+      }
       return { lines: [{ text: res.error || 'cat: read error', type: 'error' }] };
     }
 
-    const outputLines: ParseResult['lines'] = res.content
+    const outputLines: ParseResult['lines'] = (res.content || '')
       .split('\n')
       .map((line) => ({ text: line, type: 'info' }));
 
     return { lines: outputLines };
   }
 
-  // 6. POSIX VFS: VIM / VIEW
+  // 7. POSIX VFS: VIM / VIEW / NANO
   if (cmdName === 'vim' || cmdName === 'view' || cmdName === 'nano') {
     if (!vfs) return { lines: [{ text: 'vim: vfs not initialized', type: 'error' }] };
     if (!cmdArg) return { lines: [{ text: 'vim: missing file operand', type: 'error' }] };
 
-    const res = vfs.readFile(cmdArg);
-    const content = res.success && res.content !== undefined ? res.content : '';
+    const targetAbs = vfs.resolvePath(cmdArg);
+    const existingNode = vfs.getNode(targetAbs);
+
+    if (existingNode) {
+      if (existingNode.type === 'dir') {
+        return { lines: [{ text: `vim: '${cmdArg}' is a directory`, type: 'error' }] };
+      }
+      const readAccess = vfs.checkAccess(cmdArg, 'read', isRoot, passwordVerified);
+      if (!readAccess.allowed && readAccess.requiresPassword) {
+        return {
+          lines: [],
+          passwordChallenge: {
+            kind: readAccess.requiresPassword,
+            prompt:
+              readAccess.requiresPassword === 'user'
+                ? `[SECURITY CHALLENGE] Enter login password for @${session?.username || 'op'} to edit '${cmdArg}': `
+                : `[ENCRYPTED FILE] Enter decryption passkey for '${cmdArg}': `,
+            targetFile: cmdArg,
+            cipherKey: readAccess.cipherKey,
+            pendingCommand: rawInput,
+          },
+        };
+      }
+    }
+
+    const writeAccess = vfs.checkAccess(cmdArg, 'write', isRoot, true);
+    const content = existingNode && existingNode.type === 'file' ? existingNode.content : '';
 
     return {
       lines: [],
-      openVim: { fileName: cmdArg, content },
+      openVim: {
+        fileName: cmdArg,
+        content,
+        readOnly: !writeAccess.allowed,
+      },
     };
   }
 
-  // 7. POSIX VFS: MKDIR
+  // 8. POSIX VFS: MKDIR
   if (cmdName === 'mkdir') {
     if (!vfs) return { lines: [{ text: 'mkdir: vfs not initialized', type: 'error' }] };
     if (!cmdArg) return { lines: [{ text: 'mkdir: missing operand', type: 'error' }] };
@@ -291,7 +438,7 @@ export function parseAndExecuteCommand(
     return { lines: [{ text: `Directory '${cmdArg}' created.`, type: 'success' }] };
   }
 
-  // 8. POSIX VFS: TOUCH
+  // 9. POSIX VFS: TOUCH
   if (cmdName === 'touch') {
     if (!vfs) return { lines: [{ text: 'touch: vfs not initialized', type: 'error' }] };
     if (!cmdArg) return { lines: [{ text: 'touch: missing file operand', type: 'error' }] };
@@ -300,16 +447,44 @@ export function parseAndExecuteCommand(
     return { lines: [{ text: `File '${cmdArg}' touched.`, type: 'success' }] };
   }
 
-  // 9. POSIX VFS: RM
+  // 10. POSIX VFS: RM (With Root & Password Protection)
   if (cmdName === 'rm') {
     if (!vfs) return { lines: [{ text: 'rm: vfs not initialized', type: 'error' }] };
     if (!cmdArg) return { lines: [{ text: 'rm: missing operand', type: 'error' }] };
-    const res = vfs.removeNode(cmdArg);
-    if (!res.success) return { lines: [{ text: res.error || 'rm error', type: 'error' }] };
-    return { lines: [{ text: `Removed '${cmdArg}'.`, type: 'warn' }] };
+
+    const cleanTarget = parts.filter((p) => !p.startsWith('-') && p !== 'rm')[0] || cmdArg;
+    const res = vfs.removeNode(cleanTarget, isRoot, passwordVerified);
+
+    if (!res.success) {
+      if (res.requiresPassword === 'user') {
+        return {
+          lines: [],
+          passwordChallenge: {
+            kind: 'user',
+            prompt: `[SECURITY CHALLENGE] Enter login password for @${session?.username || 'op'} to delete '${cleanTarget}': `,
+            targetFile: cleanTarget,
+            pendingCommand: rawInput,
+          },
+        };
+      }
+      if (res.requiresPassword === 'cipher') {
+        return {
+          lines: [],
+          passwordChallenge: {
+            kind: 'cipher',
+            prompt: `[ENCRYPTED FILE] Enter decryption passkey to delete '${cleanTarget}': `,
+            targetFile: cleanTarget,
+            cipherKey: res.cipherKey,
+            pendingCommand: rawInput,
+          },
+        };
+      }
+      return { lines: [{ text: res.error || 'rm error', type: 'error' }] };
+    }
+    return { lines: [{ text: `Removed '${cleanTarget}'.`, type: 'warn' }] };
   }
 
-  // 10. TACTICAL TRANSITIONS & PROTOCOLS
+  // 11. TACTICAL TRANSITIONS & PROTOCOLS
   if (trimmed === 'system.connect holotable' || trimmed === 'deploy.sector valley-4') {
     return {
       lines: [
@@ -381,7 +556,7 @@ export function parseAndExecuteCommand(
         { text: `OPERATOR ID   : @${session.username}`, type: session.isRoot ? 'root' : 'success' },
         { text: `CLEARANCE     : ${session.clearance}`, type: session.isRoot ? 'root' : 'warn' },
         { text: `ACCESS TOKEN  : ${session.token}`, type: 'info' },
-        { text: `CURRENT VFS   : ${vfs ? vfs.getCurrentPath() : '/home/' + session.username}`, type: 'info' },
+        { text: `CURRENT VFS   : ${vfs ? vfs.currentPath : '/home/' + session.username}`, type: 'info' },
         { text: `SESSION AGE   : ${duration}s`, type: 'info' },
       ],
     };
@@ -402,7 +577,7 @@ export function parseAndExecuteCommand(
   if (trimmed === 'system.override') {
     if (!isRoot) {
       return {
-        lines: [{ text: '[PERMISSION DENIED] Operation requires LV.5 ROOT clearance.', type: 'error' }],
+        lines: [{ text: "[PERMISSION DENIED] Operation requires LV.5 ROOT clearance. Run 'su' (pass: admin123).", type: 'error' }],
       };
     }
     return {
@@ -416,7 +591,7 @@ export function parseAndExecuteCommand(
   if (trimmed === 'telemetry.debug') {
     if (!isRoot) {
       return {
-        lines: [{ text: '[PERMISSION DENIED] Operation requires LV.5 ROOT clearance.', type: 'error' }],
+        lines: [{ text: "[PERMISSION DENIED] Operation requires LV.5 ROOT clearance. Run 'su' (pass: admin123).", type: 'error' }],
       };
     }
     return {
@@ -432,7 +607,7 @@ export function parseAndExecuteCommand(
   if (trimmed === 'admin.kernel') {
     if (!isRoot) {
       return {
-        lines: [{ text: '[PERMISSION DENIED] Operation requires LV.5 ROOT clearance.', type: 'error' }],
+        lines: [{ text: "[PERMISSION DENIED] Operation requires LV.5 ROOT clearance. Run 'su' (pass: admin123).", type: 'error' }],
       };
     }
     return {
@@ -481,7 +656,6 @@ export function handleTabCompletion(
     return { completedValue: rawInput, candidates: [], hasAdvanced: false, isSingleMatch: false };
   }
 
-  // 1. File and Directory autocompletion for cd, cat, vim, rm
   const fileCmds = ['cd ', 'cat ', 'vim ', 'view ', 'rm ', 'touch '];
   for (const cmd of fileCmds) {
     if (trimmed.startsWith(cmd)) {
@@ -521,7 +695,6 @@ export function handleTabCompletion(
     }
   }
 
-  // 2. Command autocompletion from COMMAND_REGISTRY
   const candidates: string[] = [];
   COMMAND_REGISTRY.forEach((cmd) => {
     if (cmd.requiresRoot && !isRoot) return;
@@ -530,7 +703,6 @@ export function handleTabCompletion(
     }
   });
 
-  // Sub-targets for navigate.to
   const navPrefix = 'navigate.to ';
   if (trimmed.startsWith(navPrefix)) {
     const sub = trimmed.slice(navPrefix.length);
